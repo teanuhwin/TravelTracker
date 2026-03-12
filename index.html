@@ -64,6 +64,22 @@
         /* CC tab accent */
         .cc-accent { color: #7c3aed; }
         .cc-banner { background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); }
+
+        /* Swipe to delete */
+        .swipe-row { position: relative; overflow: hidden; }
+        .swipe-delete-bg {
+            position: absolute; right: 0; top: 0; bottom: 0;
+            width: 80px; background: #dc2626;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 12px; font-weight: 700;
+            letter-spacing: 0.03em; gap: 4px; flex-direction: column;
+        }
+        .swipe-content {
+            position: relative; background: #fff;
+            transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
+            will-change: transform;
+        }
+        .swipe-content.swiped { transform: translateX(-80px); }
     </style>
 </head>
 <body>
@@ -79,10 +95,7 @@
                 <span id="rate-text" style="font-size:11px;color:#6b7280;font-family:'DM Mono',monospace;">Fetching rate…</span>
             </div>
         </div>
-        <button onclick="downloadCSV()" class="btn-ghost">
-            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            CSV
-        </button>
+
     </div>
 
     <!-- Main Tab Navigation: Debit | Credit | Settings -->
@@ -137,7 +150,7 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-                    <input type="text" id="debit-notes" placeholder="e.g. Convenience store" class="input-field">
+                    <input type="text" id="debit-notes" placeholder="e.g. Convenience store" class="input-field" onkeydown="if(event.key==='Enter'){event.preventDefault();submitDebit();}">
                 </div>
                 <button class="btn-primary" onclick="submitDebit()">Add Entry</button>
             </div>
@@ -206,7 +219,7 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-                    <input type="text" id="cc-notes" placeholder="e.g. Restaurant, train pass…" class="input-field">
+                    <input type="text" id="cc-notes" placeholder="e.g. Restaurant, train pass…" class="input-field" onkeydown="if(event.key==='Enter'){event.preventDefault();submitCC();}">
                 </div>
                 <button class="btn-primary" style="background:#6d28d9;" onclick="submitCC()">Add Charge</button>
             </div>
@@ -258,6 +271,24 @@
             <div id="members-list" style="display:flex;flex-direction:column;gap:10px;"></div>
         </div>
 
+        <!-- Data Backup -->
+        <div class="card mb-4" style="padding:18px;">
+            <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;">Data Backup</div>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:16px;">Download your data before a major app update, then re-upload to restore it.</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <button onclick="downloadCSV()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;border:1.5px solid #e5e7eb;background:#fafafa;color:#111827;font-size:14px;font-weight:600;cursor:pointer;">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download CSV Backup
+                </button>
+                <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;border:1.5px solid #2563eb;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:600;cursor:pointer;">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m4 4V4m0 0l4 4"/></svg>
+                    Upload CSV to Restore
+                    <input type="file" id="csv-upload" accept=".csv" style="display:none;" onchange="importCSV(event)">
+                </label>
+                <div id="import-status" style="font-size:12px;text-align:center;color:#6b7280;min-height:16px;"></div>
+            </div>
+        </div>
+
         <!-- Danger Zone -->
         <div style="background:#fff5f5;border-radius:18px;padding:18px;border:1px solid #fee2e2;" class="mb-6">
             <div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:4px;">Danger Zone</div>
@@ -305,6 +336,10 @@
             <div>
                 <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">≈ USD</label>
                 <div class="converted-preview" id="edit-usd-preview">—</div>
+            </div>
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Date</label>
+                <input type="date" id="edit-date" class="input-field">
             </div>
             <div>
                 <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes</label>
@@ -660,8 +695,6 @@ function renderCredit() {
 // ─── TRANSACTION CARD BUILDER ─────────────────────────────────────────────────
 function makeTxCard(tx, visIndex, type) {
     const memberIndex = members.indexOf(tx.person);
-    const div = document.createElement('div');
-    div.className = 'tx-card' + (visIndex === 0 ? ' new-entry' : '');
     const usd     = tx.usdValue !== undefined ? tx.usdValue : tx.jpy * tx.rate;
     const dateStr = new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const balanceStr = (type === 'debit' && tx.balanceAfter !== undefined)
@@ -671,9 +704,25 @@ function makeTxCard(tx, visIndex, type) {
         ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.notes}</div>`
         : '';
 
-    div.innerHTML = `
+    // Outer wrapper: clips the swipe reveal
+    const row = document.createElement('div');
+    row.className = 'swipe-row' + (visIndex === 0 ? ' new-entry' : '');
+    row.style.borderBottom = '1px solid #f0f2f5';
+
+    // Red delete background
+    row.innerHTML = `
+        <div class="swipe-delete-bg">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Delete
+        </div>`;
+
+    // Sliding content layer
+    const inner = document.createElement('div');
+    inner.className = 'swipe-content tx-card';
+    inner.style.borderBottom = 'none';
+    inner.innerHTML = `
         <div class="avatar ${avatarClass(memberIndex >= 0 ? memberIndex : 0)}">${initials(tx.person)}</div>
-        <div style="flex:1;min-width:0;">
+        <div style="flex:1;min-width:0;" onclick="openEditModal(${tx.index},'${type}')">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
                 <span style="font-size:14px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.person}</span>
                 <span style="font-size:15px;font-weight:700;color:#111827;font-family:'DM Mono',monospace;white-space:nowrap;">${fmtUSD(usd)}</span>
@@ -684,17 +733,92 @@ function makeTxCard(tx, visIndex, type) {
             </div>
             ${notesStr}
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-            <button onclick="openEditModal(${tx.index},'${type}')" style="padding:6px;color:#9ca3af;background:none;border:none;cursor:pointer;">
-                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-            </button>
-            <button onclick="deleteEntry(${tx.index},'${type}')" style="padding:6px;color:#d1d5db;background:none;border:none;cursor:pointer;">
-                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            </button>
+        <div style="padding-left:8px;flex-shrink:0;">
+            <svg width="14" height="14" fill="none" stroke="#d1d5db" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
         </div>
     `;
-    return div;
+
+    // ── Swipe gesture logic ─────────────────────────────────────────────────
+    let startX = 0, startY = 0, currentX = 0, dragging = false, swiped = false, isScrolling = null;
+    const THRESHOLD = 60; // px needed to trigger delete reveal
+    const DELETE_WIDTH = 80;
+
+    inner.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        dragging = true;
+        isScrolling = null;
+        inner.style.transition = 'none';
+    }, { passive: true });
+
+    inner.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+
+        // Determine scroll vs swipe on first significant movement
+        if (isScrolling === null && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            isScrolling = Math.abs(dy) > Math.abs(dx);
+        }
+        if (isScrolling) return;
+
+        e.preventDefault();
+        currentX = swiped ? dx - DELETE_WIDTH : dx;
+        // Only allow left swipe (negative), with slight rubber-band past full reveal
+        if (currentX > 0) currentX = 0;
+        if (currentX < -(DELETE_WIDTH + 16)) currentX = -(DELETE_WIDTH + 16);
+        inner.style.transform = `translateX(${currentX}px)`;
+    }, { passive: false });
+
+    inner.addEventListener('touchend', () => {
+        if (!dragging || isScrolling) { dragging = false; return; }
+        dragging = false;
+        inner.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.2,1)';
+
+        if (!swiped && currentX < -THRESHOLD) {
+            // Snap open — close any other open rows first
+            closeAllSwipeRows(row);
+            inner.style.transform = `translateX(-${DELETE_WIDTH}px)`;
+            swiped = true;
+        } else if (swiped && currentX > -(DELETE_WIDTH - THRESHOLD / 2)) {
+            // Snap closed
+            inner.style.transform = 'translateX(0)';
+            swiped = false;
+        } else {
+            // Rubber-band back
+            inner.style.transform = swiped ? `translateX(-${DELETE_WIDTH}px)` : 'translateX(0)';
+        }
+    });
+
+    // Tap on revealed delete zone
+    row.querySelector('.swipe-delete-bg').addEventListener('click', () => {
+        deleteEntry(tx.index, type);
+        inner.style.transform = 'translateX(0)';
+        swiped = false;
+    });
+
+    // Store reference so we can close this row from outside
+    row._closeSwipe = () => {
+        inner.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.2,1)';
+        inner.style.transform = 'translateX(0)';
+        swiped = false;
+    };
+
+    row.appendChild(inner);
+    return row;
 }
+
+// Close all open swipe rows except the currently active one
+function closeAllSwipeRows(exceptRow) {
+    document.querySelectorAll('.swipe-row').forEach(r => {
+        if (r !== exceptRow && r._closeSwipe) r._closeSwipe();
+    });
+}
+
+// Tapping anywhere on the page closes open swipe rows
+document.addEventListener('touchstart', e => {
+    if (!e.target.closest('.swipe-row')) closeAllSwipeRows(null);
+}, { passive: true });
 
 // ─── EDIT MODAL ───────────────────────────────────────────────────────────────
 window.openEditModal = (index, type) => {
@@ -707,6 +831,12 @@ window.openEditModal = (index, type) => {
     sel.value = tx.person;
     document.getElementById('edit-jpy').value   = Math.round(tx.jpy);
     document.getElementById('edit-notes').value = tx.notes || '';
+    // Format date as YYYY-MM-DD for the date input
+    const d = new Date(tx.date);
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, '0');
+    const dd   = String(d.getDate()).padStart(2, '0');
+    document.getElementById('edit-date').value = `${yyyy}-${mm}-${dd}`;
     updateEditPreview();
     document.getElementById('edit-modal').style.display = 'flex';
 };
@@ -716,10 +846,12 @@ window.saveEdit = () => {
     const type   = document.getElementById('edit-type').value;
     const person = document.getElementById('edit-person').value;
     const jpy    = parseFloat(document.getElementById('edit-jpy').value);
-    const notes  = document.getElementById('edit-notes').value.trim();
+    const notes   = document.getElementById('edit-notes').value.trim();
+    const dateVal = document.getElementById('edit-date').value;
     if (!(jpy > 0)) return;
     const list = type === 'debit' ? debitTx : creditTx;
-    list[index] = { ...list[index], person, jpy, rate: jpyToUsd, notes };
+    const newDate = dateVal ? new Date(dateVal + 'T' + new Date(list[index].date).toTimeString().slice(0,8)).toISOString() : list[index].date;
+    list[index] = { ...list[index], person, jpy, rate: jpyToUsd, notes, date: newDate };
     save();
     closeEditModal();
     if (type === 'debit') renderDebit(); else renderCredit();
@@ -845,6 +977,76 @@ window.downloadCSV = () => {
     const a    = document.createElement('a');
     a.href = url; a.download = `tracker_${new Date().toISOString().split('T')[0]}.csv`;
     a.click(); URL.revokeObjectURL(url);
+};
+
+// ─── CSV IMPORT ───────────────────────────────────────────────────────────────
+window.importCSV = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const status = document.getElementById('import-status');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const lines = e.target.result.trim().split('\n');
+            const header = lines[0].toLowerCase();
+            // Validate it looks like our CSV format
+            if (!header.includes('type') || !header.includes('member') || !header.includes('amount jpy')) {
+                status.textContent = '⚠️ Unrecognized CSV format.';
+                status.style.color = '#b91c1c';
+                return;
+            }
+            const newDebit = [], newCredit = [];
+            let skipped = 0;
+            lines.slice(1).forEach(line => {
+                if (!line.trim()) return;
+                // Handle quoted fields (notes may contain commas)
+                const cols = [];
+                let inQuote = false, cur = '';
+                for (const ch of line) {
+                    if (ch === '"') { inQuote = !inQuote; }
+                    else if (ch === ',' && !inQuote) { cols.push(cur); cur = ''; }
+                    else { cur += ch; }
+                }
+                cols.push(cur);
+                const [type, date, person, amtJPY, rate, , notes] = cols;
+                const jpy = parseFloat(amtJPY);
+                const r   = parseFloat(rate);
+                if (!type || !person || !(jpy > 0) || !(r > 0)) { skipped++; return; }
+                const tx = {
+                    person: person.trim(),
+                    jpy,
+                    rate: r,
+                    date: new Date(date).toISOString(),
+                    notes: (notes || '').replace(/^"|"$/g, '').trim()
+                };
+                if (type.trim().toLowerCase() === 'debit') newDebit.push(tx);
+                else newCredit.push(tx);
+                // Add any new member names found in CSV
+                if (!members.includes(tx.person)) members.push(tx.person);
+            });
+            showConfirm(
+                'Restore from CSV?',
+                `This will replace all current data with ${newDebit.length} debit and ${newCredit.length} credit transactions.`,
+                'Restore',
+                'primary',
+                () => {
+                    debitTx  = newDebit;
+                    creditTx = newCredit;
+                    save();
+                    renderSettings();
+                    const msg = `✓ Restored ${newDebit.length + newCredit.length} transactions` + (skipped ? ` (${skipped} skipped)` : '');
+                    status.textContent = msg;
+                    status.style.color = '#15803d';
+                    // Reset file input so same file can be re-uploaded if needed
+                    event.target.value = '';
+                }
+            );
+        } catch(err) {
+            status.textContent = '⚠️ Failed to parse CSV. Please use an unmodified backup file.';
+            status.style.color = '#b91c1c';
+        }
+    };
+    reader.readAsText(file);
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
