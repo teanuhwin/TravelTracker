@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="color-scheme" content="light dark">
-    <title>Shared Bank Tracker</title>
+    <title>Yen Tracking App Lite</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -197,7 +197,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h1 style="font-size:22px;font-weight:700;color:var(--text);line-height:1.2;">Shared Bank Tracker</h1>
+            <h1 style="font-size:22px;font-weight:700;color:var(--text);line-height:1.2;">Yen Tracking App Lite</h1>
             <div style="margin-top:4px;display:flex;align-items:center;gap:5px;">
                 <span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span>
                 <span id="rate-text" style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">Fetching rate…</span>
@@ -257,7 +257,7 @@
                     <div class="converted-preview" id="debit-converted">—</div>
                 </div>
                 <div>
-                    <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+                    <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></label>
                     <button class="notes-trigger" id="debit-notes-trigger" onclick="openCategoryPicker('debit')">
                         <span id="debit-notes-label">Add note or category…</span>
                         <svg width="14" height="14" fill="none" stroke="var(--text4)" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -278,12 +278,12 @@
 
         <!-- Transaction List -->
         <div class="card mb-6" style="overflow:hidden;margin-top:4px;">
-            <div style="padding:14px 16px;border-bottom:1px solid #f0f2f5;display:flex;justify-content:space-between;align-items:center;">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-size:13px;font-weight:700;color:var(--text);">Recent Activity</span>
                 <span id="debit-tx-count" style="font-size:11px;color:var(--text4);font-weight:500;"></span>
             </div>
             <div id="debit-tx-list"></div>
-            <div id="debit-empty" style="padding:40px 16px;text-align:center;color:#9ca3af;font-size:14px;display:none;">No transactions yet.</div>
+            <div id="debit-empty" style="padding:40px 16px;text-align:center;color:var(--text4);font-size:14px;display:none;">No transactions yet.</div>
         </div>
     </div>
 
@@ -330,7 +330,7 @@
                     <div class="converted-preview" id="cc-converted">—</div>
                 </div>
                 <div>
-                    <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+                    <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></label>
                     <button class="notes-trigger" id="cc-notes-trigger" onclick="openCategoryPicker('cc')">
                         <span id="cc-notes-label">Add note or category…</span>
                         <svg width="14" height="14" fill="none" stroke="var(--text4)" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -351,12 +351,12 @@
 
         <!-- CC Transaction List -->
         <div class="card mb-6" style="overflow:hidden;margin-top:4px;">
-            <div style="padding:14px 16px;border-bottom:1px solid #f0f2f5;display:flex;justify-content:space-between;align-items:center;">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-size:13px;font-weight:700;color:var(--text);">CC Activity</span>
                 <span id="cc-tx-count" style="font-size:11px;color:var(--text4);font-weight:500;"></span>
             </div>
             <div id="cc-tx-list"></div>
-            <div id="cc-empty" style="padding:40px 16px;text-align:center;color:#9ca3af;font-size:14px;display:none;">No charges yet.</div>
+            <div id="cc-empty" style="padding:40px 16px;text-align:center;color:var(--text4);font-size:14px;display:none;">No charges yet.</div>
         </div>
     </div>
 
@@ -798,7 +798,8 @@ function sortedCategories(filter) {
 
 function openCategoryPicker(target) {
     catPickerTarget = target;
-    const current = document.getElementById(target + '-notes').value;
+    const notesEl  = document.getElementById(target + '-notes');
+    const current  = notesEl ? notesEl.value : '';
     document.getElementById('cat-search-input').value = '';
     document.getElementById('cat-add-hint').textContent = '';
     document.getElementById('cat-add-btn').style.display = 'none';
@@ -822,7 +823,12 @@ function renderCatPills(filter, selected) {
     }
     cats.forEach(cat => {
         const btn = document.createElement('button');
+        const p   = pillPalette(cat);
+        const isDk = document.body.classList.contains('dark');
         btn.className = 'cat-pill' + (cat === selected ? ' selected' : '');
+        btn.style.background  = isDk ? p.dbg   : p.bg;
+        btn.style.color       = isDk ? p.dcolor : p.color;
+        btn.style.borderColor = 'transparent';
         btn.textContent = cat;
         btn.onclick = () => selectCategory(cat);
         grid.appendChild(btn);
@@ -830,7 +836,8 @@ function renderCatPills(filter, selected) {
 }
 
 function onCatSearch(val) {
-    const current = document.getElementById(catPickerTarget + '-notes').value;
+    const notesEl = document.getElementById(catPickerTarget + '-notes');
+    const current = notesEl ? notesEl.value : '';
     renderCatPills(val, current);
     const trimmed = val.trim();
     const addBtn  = document.getElementById('cat-add-btn');
@@ -1083,7 +1090,7 @@ function makeTxCard(tx, visIndex, type) {
     // Outer wrapper: clips the swipe reveal
     const row = document.createElement('div');
     row.className = 'swipe-row' + (visIndex === 0 ? ' new-entry' : '');
-    row.style.borderBottom = '1px solid #f0f2f5';
+    row.style.borderBottom = '1px solid var(--divider)';
 
     // Red delete background
     row.innerHTML = `
@@ -1110,7 +1117,7 @@ function makeTxCard(tx, visIndex, type) {
             ${notesStr}
         </div>
         <div style="padding-left:8px;flex-shrink:0;">
-            <svg width="14" height="14" fill="none" stroke="#d1d5db" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <svg width="14" height="14" fill="none" stroke="var(--text4)" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
         </div>
     `;
 
@@ -1304,8 +1311,8 @@ window.saveStartingBalance = () => {
     save();
     // Flash feedback
     const btn = document.querySelector('[onclick="saveStartingBalance()"]');
-    btn.textContent = '✓ Saved'; btn.style.background = '#dcfce7'; btn.style.color = '#15803d';
-    setTimeout(() => { btn.textContent = 'Save'; btn.style.background = '#eff6ff'; btn.style.color = '#1d4ed8'; }, 1500);
+    btn.textContent = '✓ Saved'; btn.style.background = 'var(--blue-bg)'; btn.style.color = 'var(--blue)';
+    setTimeout(() => { btn.textContent = 'Save'; btn.style.background = 'var(--blue-bg)'; btn.style.color = 'var(--blue)'; }, 1500);
 };
 
 function addMember() {
@@ -1359,8 +1366,8 @@ window.saveMemberName = (index) => {
     const ci = ccSelected.indexOf(oldName);    if (ci >= 0) ccSelected[ci]    = newName;
     save();
     const btn = document.getElementById('member-save-btn-' + index);
-    btn.textContent = '✓'; btn.style.background = '#dcfce7'; btn.style.color = '#15803d';
-    setTimeout(() => { btn.textContent = 'Save'; btn.style.background = '#eff6ff'; btn.style.color = '#1d4ed8'; }, 1200);
+    btn.textContent = '✓'; btn.style.background = 'var(--blue-bg)'; btn.style.color = 'var(--blue)';
+    setTimeout(() => { btn.textContent = 'Save'; btn.style.background = 'var(--blue-bg)'; btn.style.color = 'var(--blue)'; }, 1200);
 };
 
 window.clearDebitData = () => {
