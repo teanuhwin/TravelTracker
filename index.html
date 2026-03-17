@@ -505,20 +505,6 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════
-     CURRENCY CHANGE MODAL
-═══════════════════════════════════════════════════ -->
-<div id="cur-change-modal" class="modal-overlay">
-    <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div id="cur-change-title" style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;text-align:center;"></div>
-        <div id="cur-change-sub" style="font-size:13px;color:var(--text3);margin-bottom:22px;text-align:center;line-height:1.5;"></div>
-        <button id="cur-recalc-btn" style="width:100%;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px;background:var(--text);color:var(--surface);">Yes, recalculate</button>
-        <button id="cur-keep-btn" style="width:100%;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:10px;background:var(--surface2);color:var(--text2);border:1.5px solid var(--border);">No, keep old rates</button>
-        <button onclick="closeCurChangeModal()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--surface3);color:var(--text3);font-size:15px;font-weight:600;cursor:pointer;">Cancel</button>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
      EDIT TRANSACTION MODAL
 ═══════════════════════════════════════════════════ -->
 <div id="edit-modal" class="modal-overlay">
@@ -677,6 +663,50 @@ let debitSelected = [];
 let ccSelected    = [];
 
 // ─── EXCHANGE RATE ────────────────────────────────────────────────────────────
+// Fallback rates vs USD (approximate, updated March 17 2026).
+// Used only when network is unavailable AND no cached rate exists.
+// All values: 1 unit of CURRENCY = X USD.
+// Sources: IndexBox Mar 10 2026, BCA Mar 17 2026, exchange-rates.org
+const FALLBACK_RATES_TO_USD = {
+    JPY: 0.006335,   // ~157.9 JPY/USD  (IndexBox Mar 10)
+    EUR: 1.1631,     // ~0.860 EUR/USD  (IndexBox Mar 10)
+    GBP: 1.3447,     // ~0.744 GBP/USD  (IndexBox Mar 10)
+    AUD: 0.7114,     // ~1.406 AUD/USD  (IndexBox Mar 10)
+    CAD: 0.7365,     // ~1.358 CAD/USD  (IndexBox Mar 10)
+    CHF: 1.2881,     // ~0.776 CHF/USD  (IndexBox Mar 10)
+    CNY: 0.1447,     // ~6.91  CNY/USD  (IndexBox Mar 10)
+    HKD: 0.1285,     // ~7.78  HKD/USD  (peg range)
+    KRW: 0.000688,   // ~1454  KRW/USD  (exchange-rates.org avg)
+    SGD: 0.7858,     // ~1.273 SGD/USD  (IndexBox Mar 10)
+    TWD: 0.0308,     // ~32.5  TWD/USD
+    THB: 0.0290,     // ~34.5  THB/USD
+    INR: 0.01087,    // ~92.0  INR/USD  (IndexBox Mar 10)
+    MXN: 0.05689,    // ~17.6  MXN/USD  (IndexBox Mar 10)
+    BRL: 0.19308,    // ~5.18  BRL/USD  (IndexBox Mar 10)
+    SEK: 0.0971,     // ~10.3  SEK/USD
+    NOK: 0.0952,     // ~10.5  NOK/USD
+    DKK: 0.1466,     // ~6.82  DKK/USD  (EUR peg)
+    NZD: 0.5740,     // ~1.74  NZD/USD
+    ZAR: 0.0546,     // ~18.3  ZAR/USD
+    AED: 0.2723,     // ~3.673 AED/USD  (pegged)
+    VND: 0.0000394,  // ~25,381 VND/USD
+    PHP: 0.01739,    // ~57.5  PHP/USD
+    IDR: 0.0000589,  // ~16,977 IDR/USD (BCA Mar 17)
+    USD: 1.0000,
+};
+
+function getFallbackRate(from, to) {
+    // Each entry = "1 unit of CURRENCY in USD".
+    // To get "how many TO units = 1 FROM unit":
+    //   1 FROM = fromUsd USD
+    //   1 TO   = toUsd USD
+    //   → 1 FROM = fromUsd / toUsd  units of TO
+    const fromUsd = FALLBACK_RATES_TO_USD[from];
+    const toUsd   = FALLBACK_RATES_TO_USD[to];
+    if (!fromUsd || !toUsd) return null;
+    return fromUsd / toUsd; // from → to via USD
+}
+
 async function fetchRateForPair(from, to) {
     const sources = [
         async () => { const r = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`,{signal:AbortSignal.timeout(5000)}); const d = await r.json(); return d.rates[to]; },
@@ -700,8 +730,21 @@ async function fetchRate() {
         localStorage.setItem('cached_rate', rate.toString());
         setRateBadge('live');
         updateDebitPreview(); updateCCPreview();
-    } else {
+        return;
+    }
+    // No live rate — try localStorage cache first, then static fallback
+    const cached = parseFloat(localStorage.getItem('cached_rate'));
+    if (cached && cached > 0) {
+        foreignToHome = cached;
         setRateBadge('cached');
+    } else {
+        const fallback = getFallbackRate(foreignCurCode, homeCurCode);
+        if (fallback) {
+            foreignToHome = fallback;
+            setRateBadge('fallback');
+        } else {
+            setRateBadge('cached'); // nothing we can do
+        }
     }
 }
 
@@ -710,9 +753,10 @@ function setRateBadge(state) {
     const text = document.getElementById('rate-text');
     const dp   = foreignCur().decimals === 0 ? 6 : 4;
     const str  = `1 ${foreignCurCode} = ${foreignToHome.toFixed(dp)} ${homeCurCode}`;
-    if (state === 'fetching') { dot.style.background='#f59e0b'; text.textContent='Fetching rate…'; }
-    else if (state === 'live')  { dot.style.background='#10b981'; text.textContent=`Live · ${str}`; }
-    else                        { dot.style.background='#9ca3af'; text.textContent=`Cached · ${str}`; }
+    if      (state === 'fetching')  { dot.style.background='#f59e0b'; text.textContent='Fetching rate…'; }
+    else if (state === 'live')      { dot.style.background='#10b981'; text.textContent=`Live · ${str}`; }
+    else if (state === 'fallback')  { dot.style.background='#f97316'; text.textContent=`Estimate · ${str}`; }
+    else                            { dot.style.background='#9ca3af'; text.textContent=`Cached · ${str}`; }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1483,68 +1527,65 @@ window.saveCurrencySettings = () => {
     }
 
     const txCount = debitTx.length + creditTx.length;
+    const sub = txCount > 0
+        ? `${txCount} existing transaction${txCount !== 1 ? 's' : ''} will be recalculated at the new rate.`
+        : '';
 
-    // No past transactions — just apply silently
-    if (txCount === 0) {
-        applyCurrencyChange(newForeign, newHome, false, status);
-        return;
-    }
-
-    // Show the two-option modal
-    document.getElementById('cur-change-title').textContent = `Switch to ${newForeign} → ${newHome}?`;
-    document.getElementById('cur-change-sub').textContent =
-        `You have ${txCount} existing transaction${txCount !== 1 ? 's' : ''}. ` +
-        `Do you want to recalculate their home-currency values using the current ${newForeign}/${newHome} rate?`;
-
-    const recalcBtn = document.getElementById('cur-recalc-btn');
-    const keepBtn   = document.getElementById('cur-keep-btn');
-
-    recalcBtn.onclick = () => {
-        closeCurChangeModal();
-        applyCurrencyChange(newForeign, newHome, true, status);
-    };
-    keepBtn.onclick = () => {
-        closeCurChangeModal();
-        applyCurrencyChange(newForeign, newHome, false, status);
-    };
-
-    document.getElementById('cur-change-modal').style.display = 'flex';
+    showConfirm(`Switch to ${newForeign} → ${newHome}?`, sub, 'Apply', 'primary', () => {
+        applyCurrencyChange(newForeign, newHome, status);
+    });
 };
 
-function closeCurChangeModal() {
-    document.getElementById('cur-change-modal').style.display = 'none';
-}
-
-async function applyCurrencyChange(newForeign, newHome, recalculate, statusEl) {
+async function applyCurrencyChange(newForeign, newHome, statusEl) {
     const btn = document.querySelector('[onclick="saveCurrencySettings()"]');
     if (statusEl) statusEl.textContent = 'Fetching rate…';
     if (btn) btn.disabled = true;
 
-    const rate = await fetchRateForPair(newForeign, newHome);
+    // Try live rate, then fall back to static table
+    let rate = await fetchRateForPair(newForeign, newHome);
+    let rateSource = 'live';
     if (!rate) {
-        if (statusEl) statusEl.textContent = '⚠️ Could not fetch rate. Check connection and try again.';
+        rate = getFallbackRate(newForeign, newHome);
+        rateSource = 'fallback';
+    }
+    if (!rate) {
+        if (statusEl) statusEl.textContent = '⚠️ Could not determine rate. Try again with a connection.';
         if (btn) btn.disabled = false;
         return;
+    }
+
+    // Convert starting balance if home currency is changing.
+    // startingBalance is stored in the OLD home currency — convert it to the new one.
+    if (newHome !== homeCurCode) {
+        const oldHomeToNewHome = await fetchRateForPair(homeCurCode, newHome)
+                              || getFallbackRate(homeCurCode, newHome)
+                              || 1;
+        startingBalance = startingBalance * oldHomeToNewHome;
     }
 
     foreignCurCode = newForeign;
     homeCurCode    = newHome;
     foreignToHome  = rate;
-    localStorage.setItem('cached_rate', rate.toString());
+    if (rateSource === 'live') localStorage.setItem('cached_rate', rate.toString());
 
-    if (recalculate) {
-        [...debitTx, ...creditTx].forEach(tx => { tx.rate = rate; });
-    }
+    // Recalculate all transactions to preserve their home-currency value.
+    // Each tx stores the foreign amount (tx.jpy) and the rate used (tx.rate).
+    // We derive the original home value, then back-calculate the new foreign amount.
+    [...debitTx, ...creditTx].forEach(tx => {
+        const homeValue = tx.jpy * tx.rate;
+        tx.jpy  = homeValue / rate;
+        tx.rate = rate;
+    });
 
     save();
     updateCurrencyLabels();
-    setRateBadge('live');
+    setRateBadge(rateSource === 'fallback' ? 'fallback' : 'live');
     renderDebit();
     renderSettings();
     if (btn) btn.disabled = false;
 
-    const recalcNote = recalculate ? ' · past transactions recalculated' : ' · past rates kept';
-    if (statusEl) statusEl.textContent = `✓ Now using ${newForeign} → ${newHome}${recalcNote}`;
+    const sourceNote = rateSource === 'fallback' ? ' · using estimate rate' : '';
+    if (statusEl) statusEl.textContent = `✓ Now using ${newForeign} → ${newHome}${sourceNote}`;
 }
 
 function addMember() {
@@ -1627,7 +1668,7 @@ function showConfirm(message, sub, okLabel, okStyle, onOk) {
     document.getElementById('confirm-sub').textContent = sub;
     const ok = document.getElementById('confirm-ok');
     ok.textContent = okLabel;
-    ok.style.background = okStyle === 'danger' ? '#dc2626' : 'var(--text)';
+    ok.style.background = okStyle === 'danger' ? '#dc2626' : 'var(--blue)';
     ok.style.color = '#fff';
     ok.onclick = () => { closeConfirm(); onOk(); };
     document.getElementById('confirm-modal').style.display = 'flex';
