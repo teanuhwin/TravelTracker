@@ -1,155 +1,161 @@
 # Yen Tracking App Lite
 
-A mobile-first Progressive Web App (PWA) for tracking shared spending across a travel group. Tracks foreign-currency withdrawals from a shared cash fund and credit card charges, with live exchange rate conversion, multi-currency support, dark mode, and full offline capability. No account, no server, no setup required.
+A mobile-first Progressive Web App (PWA) for tracking shared spending across a travel group. Supports multiple trips, 25 currencies, live exchange rates, dark mode, and full offline operation. No account, no server, no setup required.
 
 ---
 
 ## Features
 
+### Multiple Trips
+- Create a trip for each destination — each has its own name, spending currency, starting balance, and members.
+- Switch between trips instantly using the pill strip at the top of the screen.
+- Tap `···` on any trip chip to rename, archive, or delete it.
+- Tap `+` to create a new trip or restore an archived one.
+- Archived trips are hidden from the strip but preserved in full — unarchive at any time.
+- Deleting a trip permanently removes all its transactions. The last trip cannot be deleted; a fresh one is created instead.
+- On first launch after an update, existing data is automatically migrated into the trip system as "My Trip" with no data loss.
+
 ### Two Tracking Tabs
-- **Debit** — tracks cash withdrawals against a shared declining fund balance. Shows remaining funds and percentage used in real time.
+- **Debit** — tracks cash withdrawals against a shared declining fund balance. Shows remaining funds, total spent, percentage used, and a subtle progress bar.
 - **Credit** — tracks credit card charges separately with per-member totals and a running group total.
 
 ### Live Exchange Rate
-- Automatically fetches the current rate for the active currency pair from three independent sources in sequence: frankfurter.app, open.er-api.com, exchangerate.host.
-- Falls back to the last cached rate if all sources fail (e.g. airplane mode, subway).
-- Rate badge in the header shows live (green), fetching (yellow), or cached (gray) status.
-- Refreshes every 15 minutes while the app is open.
+- Fetches the current rate for the active currency pair from three independent sources in sequence: frankfurter.app, open.er-api.com, exchangerate.host.
+- Falls back to the last cached rate (gray dot), then to built-in approximate rates (orange "Estimate" dot) if all APIs are unreachable.
+- Rate badge in the header shows live (green), fetching (yellow), estimate (orange), or cached (gray).
+- Refreshes every 15 minutes while the app is open. Each trip stores its own cached rate.
 
 ### Multi-Currency Support
-- Configure your spending currency ("I'm spending in") and tracking currency ("I track in") independently from Settings.
+- Configure spending and tracking currencies independently in Settings → Currency.
 - 25 currencies supported: JPY, USD, EUR, GBP, AUD, CAD, CHF, CNY, HKD, KRW, SGD, TWD, THB, INR, MXN, BRL, SEK, NOK, DKK, NZD, ZAR, AED, VND, PHP, IDR.
-- Default pair is JPY → USD.
+- Built-in fallback rates (updated March 2026) for offline use.
 - Whole-unit currencies (JPY, KRW, VND, TWD, IDR) display and round correctly with no decimal places.
-- When changing currency pair, you are prompted whether to recalculate past transaction values at the new rate, or keep the original rates as recorded.
+- When changing currency, all past transactions are recalculated to preserve their home-currency value. The starting balance is also converted automatically.
+- The home currency ("I track in") is global across all trips. The spending currency ("I'm spending in") is per-trip.
 
 ### Entry Form
-- **Multi-member selection** — tap one or more member chips to assign an entry. Selecting multiple members splits the amount evenly, with any indivisible remainder assigned to the first selected member. The converted preview updates in real time to show the per-person breakdown.
-- **Currency input toggle** — enter amounts in either the foreign or home currency; the other is calculated and shown instantly.
-- **Enter key flow** — pressing Enter on the amount field jumps directly to the note/category picker with the keyboard focused on search.
-- **Note / category picker** — a bottom sheet with frequency-sorted category pills. Tap a pill to select, or type to filter live. Custom entries can be saved to your list with one tap, or used as a one-off without saving.
+- **Multi-member selection** — tap one or more member chips to assign an entry. Selecting multiple members splits the amount evenly, with any indivisible remainder going to the first selected member. The converted preview updates in real time to show the per-person breakdown.
+- **Currency input toggle** — enter in either the foreign or home currency; the other is calculated instantly.
+- **Enter key flow** — pressing Enter on the amount field opens the note/category picker directly with keyboard focused on search.
+- **Note / category picker** — bottom sheet with frequency-sorted category pills. Tap to select, type to filter live. Custom entries can be saved to your list or used as one-offs.
+- **Undo** — a toast appears for 4 seconds after each submission. Tap Undo to remove the entry (or all splits from a multi-member entry) instantly.
 
 ### Recent Activity
-- **Swipe left** on any row to reveal a red Delete button — standard iOS gesture.
-- **Tap any row** to open the edit sheet. Edit the member, amount, date, or note after the fact.
-- **Filter** by member or **sort** by date or amount using the pill bar above the list.
-
-### Member Summary Cards
-- Per-member totals in both home and foreign currency, updated in real time.
-- Renaming a member in Settings updates all their past transactions automatically.
+- **Swipe left** on any row to reveal a red Delete button.
+- **Tap any row** to open the edit sheet — change the member, amount, date, or note after the fact.
+- **Filter** by member or **sort** by date or amount.
 
 ### Note / Category Picker
-- Bottom sheet opens from the Notes field on the entry form and the edit modal.
-- Shows all saved categories sorted by most recently used first.
-- Each saved category has a unique color derived from its name — stable across sessions.
-- Custom one-off notes (not saved to the list) display in a neutral style.
-- Type to filter existing categories live; if your text doesn't match any category, a "+ Save" button appears to add it to the list.
-- Pressing Enter in the search field confirms the selection.
+- Category pills sorted by most recently used first.
+- Each saved category has a unique color derived from its name — stable across sessions and devices.
+- Custom one-off notes display in a neutral style without being saved.
+- Type to filter; press Enter or tap `+ Save` to add a new category to your list.
+- Categories are global — shared across all trips and both tabs.
 
 ### Dark Mode
-- Full dark theme toggle in Settings. Covers every surface — cards, modals, banners, pickers, the tab bar, and all text.
-- Persists across sessions. Applies immediately on load with no flash of light mode.
+- Full dark theme toggle in Settings. Every surface adapts — cards, modals, banners, pickers, tab bar.
+- Applies immediately on load with no flash. Preference persists across sessions.
 
 ---
 
 ## Settings
 
 ### Currency
-- Two dropdowns: spending currency and tracking currency.
-- Tap "Apply Currency Settings" to fetch the live rate and switch.
-- If you have existing transactions, you are asked: recalculate their home-currency values at the new rate, or keep the rates as originally recorded.
+- "I'm spending in" — the foreign currency for the active trip.
+- "I track in" — the home currency (global across all trips).
+- Tap **Apply** to fetch the live rate and switch. Past transactions are recalculated to preserve their home-currency values.
 
 ### Starting Balance
-- Set the initial debit fund amount in your home currency.
-- The symbol and currency label update automatically when you change your home currency.
+- The initial debit fund amount in your home currency.
+- Symbol and label update automatically when the home currency changes.
 
 ### Dark Mode
 - Toggle between light and dark themes.
 
 ### Members
-- Add, rename, or remove members.
-- Renaming updates all past transactions automatically.
+- Per-trip. Add, rename, or remove members.
+- Renaming updates all past transactions for that trip automatically.
 - Removing a member keeps their transaction history intact.
 
 ### Categories
-- Add or remove note categories used in the picker.
+- Global across all trips. Add or remove note categories used in the picker.
 - Removing a category only affects the picker — past transaction notes are never modified.
-- Categories are shared across both the Debit and Credit tabs.
 
 ### Data Backup
-- **Download CSV Backup** — exports all debit and credit transactions with type, date, member, foreign amount, exchange rate, home amount, and notes. Column headers and decimal places reflect the active currency pair.
-- **Upload CSV to Restore** — select a backup file to restore all transactions. Any member names in the CSV not currently in your list are added automatically.
+- **Download CSV Backup** — exports all transactions for the active trip. Column headers reflect the active currency pair.
+- **Upload CSV to Restore** — restores transactions into the current trip. Member names found in the CSV are added to the trip's member list automatically.
 
 ### Danger Zone
-- Reset Debit, Reset Credit, or Reset Everything independently. All require confirmation before executing.
+- **Reset Debit** — clears debit transactions for the current trip.
+- **Reset Credit** — clears credit transactions for the current trip.
+- **Reset Everything** — wipes all trips, members, categories, and settings from the device.
 
 ---
 
 ## Installing on iPhone (PWA)
 
-No App Store required. The app installs directly from Safari.
+No App Store required. Installs directly from Safari.
 
-1. Host all three files (`index.html`, `sw.js`, `manifest.json`) in the **same folder** on a static host (GitHub Pages, Netlify, etc.). The main file must be named `index.html`.
-2. Open the hosted URL in **Safari** on your iPhone.
-3. Tap the **Share** button → **Add to Home Screen** → **Add**.
+1. Host `index.html`, `sw.js`, and `manifest.json` in the **same folder** on a static host (GitHub Pages, Netlify, etc.).
+2. Open the URL in **Safari** on your iPhone.
+3. Tap **Share** → **Add to Home Screen** → **Add**.
 
-The app launches full-screen from your home screen like a native app, with no browser chrome visible.
+The app launches full-screen like a native app with no browser chrome.
 
 ---
 
 ## Offline Support
 
-A service worker (`sw.js`) caches the entire app shell on first load — including fonts and the Tailwind CSS library. Once cached, the app works fully offline.
+A service worker (`sw.js`) caches the full app shell on first load, including fonts and Tailwind CSS. Once cached, the app works completely offline.
 
-- All transaction data is stored in `localStorage` on the device.
-- Exchange rate requests bypass the cache (live data only) and fall back silently to the last saved rate.
-- All data entry, editing, and deletion works with no network connection.
+- All data is stored in `localStorage` on the device.
+- Exchange rate requests fall back gracefully to cached or built-in rates.
+- All entry, editing, deletion, and trip-switching works with no connection.
 
-> **Important:** Clearing Safari's website data (Settings → Safari → Advanced → Website Data) will erase both the service worker cache **and** all saved transactions. Always download a CSV backup before doing this.
+> **Important:** Clearing Safari website data (Settings → Safari → Advanced → Website Data) erases the service worker cache **and** all transactions. Download a CSV backup before doing this.
 
 ---
 
-## Receiving App Updates
+## Receiving Updates
 
 When new files are uploaded to your host:
 
 1. Open the app — it detects the update in the background.
 2. Close and reopen — the new version activates.
 
-To force a full cache refresh, increment the version string in `sw.js`:
+Bump the version string in `sw.js` to force a full cache refresh:
 ```js
-const CACHE_NAME = 'yen-tracker-v2'; // bump this on each release
+const CACHE_NAME = 'yen-tracker-v2'; // increment on each release
 ```
 
 ---
 
 ## Split Transactions
 
-When multiple members are selected, the total foreign amount is divided evenly. Any remainder is assigned to the first selected member. Each person's share is recorded as a separate transaction with the same date and note.
+Selecting multiple members splits the total evenly. Any remainder (always ≤ n−1 smallest units) goes to the first selected member. Each share is saved as a separate transaction with the same date and note. The split respects each currency's decimal precision.
 
-The split logic works correctly across all currency types — whole-unit currencies (JPY, KRW) split in whole units, decimal currencies (EUR, USD) split to the appropriate precision.
-
-**Even split:** 3 members, ¥9,000 → ¥3,000 each.
-
-**Uneven split:** 3 members, ¥3,001 → Member A ¥1,001, Members B and C ¥1,000 each.
-
-**Decimal example:** 2 members, €10.01 → Member A €5.01, Member B €5.00.
+**Even:** 3 members, ¥9,000 → ¥3,000 each  
+**Uneven:** 3 members, ¥3,001 → A gets ¥1,001, B and C get ¥1,000  
+**Decimal:** 2 members, €10.01 → A gets €5.01, B gets €5.00
 
 ---
 
-## Data Backup & Restore
+## Data Model
 
-Found under **Settings → Data Backup**.
-
-**To back up:** tap **Download CSV Backup**. The file name includes today's date. Column headers reflect the active currency pair (e.g. "Amount EUR, Amount GBP").
-
-**To restore:** tap **Upload CSV to Restore**, select your backup file, and confirm. The app validates the CSV format before showing the confirmation prompt.
-
-CSV format:
 ```
-Type, Date, Member, Amount JPY, Rate, Amount USD, Notes
-Debit, 1/15/2025, Alice, 5000, 0.006623, 33.12, "Convenience store"
-Credit, 1/15/2025, Bob, 12000, 0.006623, 79.48, "Restaurant"
+trips_index              global — [{id, name, archived, createdAt}]
+active_trip_id           global — currently active trip
+trip_{id}_debit          per-trip — debit transactions
+trip_{id}_credit         per-trip — credit transactions
+trip_{id}_members        per-trip — members array
+trip_{id}_balance        per-trip — starting balance (in home currency)
+trip_{id}_foreign        per-trip — foreign currency code
+trip_{id}_rate           per-trip — cached exchange rate
+trip_{id}_name           per-trip — trip display name
+home_cur                 global — home currency code
+categories               global — note categories
+cat_usage                global — category usage counts
+dark_mode                global — theme preference
 ```
 
 ---
@@ -157,23 +163,22 @@ Credit, 1/15/2025, Bob, 12000, 0.006623, 79.48, "Restaurant"
 ## File Structure
 
 ```
-index.html    — Full app (HTML, CSS, JavaScript in one file)
+index.html    — Full app (HTML, CSS, JavaScript)
 sw.js         — Service worker for offline caching
-manifest.json — PWA manifest (name, icon, theme color)
+manifest.json — PWA manifest (name, icon, theme)
 README.md     — This file
 ```
-
-All three app files must be in the same directory for the service worker and manifest to register correctly.
 
 ---
 
 ## Technical Notes
 
 - **No build step** — plain HTML/CSS/JS. Deploy by dropping files into any static host.
-- **No runtime dependencies** — Tailwind CSS and Google Fonts are cached by the service worker on first load and served locally thereafter.
+- **No runtime dependencies** — Tailwind CSS and Google Fonts are cached by the service worker on first load.
 - **Storage** — `localStorage` only. No server, no account, no third-party data access.
-- **Exchange rates** — three free, no-key, CORS-permissive APIs tried in sequence with 5-second timeouts. Silent fallback to last cached rate on failure. Rate pair is fully dynamic based on the active currency configuration.
-- **Currency handling** — each currency specifies its decimal count (0 for JPY/KRW/VND/TWD/IDR, 2 for all others). All formatting, splitting, and CSV export respect this.
-- **Dark mode** — CSS custom properties with a `body.dark` class toggle. No flash on load; preference stored in `localStorage`.
-- **iOS PWA quirks handled** — `confirm()` dialogs replaced with custom bottom sheet modals (blocked in iOS standalone mode); inputs forced to 16px font size to prevent Safari auto-zoom; safe area insets applied for notched devices.
-- **Pill colors** — each saved category gets a stable color via a hash of its name, with separate light/dark values. Colors persist across sessions and devices without any stored state.
+- **Exchange rates** — three free, no-key, CORS-permissive APIs with 5-second timeouts, then fallback to per-trip cached rate, then built-in approximate rates (March 2026).
+- **Currency math** — all splitting, formatting, and CSV export respect each currency's decimal count (0 for JPY/KRW/VND/TWD/IDR, 2 for all others).
+- **Dark mode** — CSS custom properties with a `body.dark` class toggle. No flash on load.
+- **iOS PWA quirks** — `confirm()` replaced with custom bottom sheet modals; inputs forced to 16px to prevent Safari auto-zoom; safe area insets applied for notched devices.
+- **Pill colors** — each category gets a stable color via a hash of its name, with separate light/dark values. No stored state required.
+- **Swipe-down modals** — the Trips sheet supports swipe-down-to-dismiss with live transform tracking and proportional backdrop dimming.

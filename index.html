@@ -127,7 +127,9 @@
         /* Bottom sheet modal */
         .modal-overlay { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); align-items: flex-end; justify-content: center; }
         #cat-modal { z-index: 1100; }
-        .modal-sheet { background: var(--modal-bg); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 480px; box-shadow: 0 -4px 24px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-sheet { background: var(--modal-bg); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 480px; box-shadow: 0 -4px 24px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; touch-action: pan-y; }
+        .modal-sheet.dragging { transition: none !important; }
+        .modal-overlay.drag-dismiss { transition: background 0.2s; }
         .modal-handle { width: 36px; height: 4px; background: var(--handle); border-radius: 2px; margin: 0 auto 20px; }
 
         /* CC tab accent */
@@ -173,6 +175,52 @@
             display: none; white-space: nowrap;
         }
 
+        /* Trip switcher */
+        .trip-strip { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 8px; margin-bottom: 2px; }
+        .trip-strip::-webkit-scrollbar { display: none; }
+        .trip-chip {
+            display: flex; align-items: center; gap: 6px; white-space: nowrap;
+            padding: 7px 13px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            border: 1.5px solid var(--border); background: var(--surface2); color: var(--text3);
+            cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .trip-chip.active { border-color: var(--blue); background: var(--blue-bg); color: var(--blue); }
+        .trip-chip .trip-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+        .trip-chip .trip-chip-more {
+            font-size: 16px; line-height: 1; opacity: 0.5; margin-left: 2px;
+            padding: 0 2px; border: none; background: none; cursor: pointer; color: inherit;
+        }
+        .trip-chip.active .trip-chip-more { opacity: 0.7; }
+        .trip-add-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+            border: 1.5px dashed var(--border); background: none; color: var(--text4);
+            font-size: 18px; cursor: pointer; transition: all 0.15s;
+        }
+        .trip-add-btn:active { background: var(--surface3); }
+
+        /* Undo toast */
+        #undo-toast {
+            position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+            left: 50%; transform: translateX(-50%) translateY(20px);
+            background: var(--text); color: var(--surface);
+            padding: 12px 18px; border-radius: 12px;
+            font-size: 14px; font-weight: 600;
+            display: flex; align-items: center; gap: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            opacity: 0; transition: opacity 0.2s, transform 0.2s;
+            z-index: 2000; white-space: nowrap; pointer-events: none;
+        }
+        #undo-toast.show {
+            opacity: 1; transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+        #undo-toast button {
+            background: none; border: none; color: var(--blue);
+            font-size: 14px; font-weight: 700; cursor: pointer; padding: 0;
+        }
+
         /* Swipe to delete */
         .swipe-row { position: relative; overflow: hidden; }
         .swipe-delete-bg {
@@ -194,16 +242,14 @@
 
 <div style="max-width:480px;margin:0 auto;" class="px-4 pt-4 safe-bottom">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h1 style="font-size:22px;font-weight:700;color:var(--text);line-height:1.2;">Yen Tracking App Lite</h1>
-            <div style="margin-top:4px;display:flex;align-items:center;gap:5px;">
-                <span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-                <span id="rate-text" style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">Fetching rate…</span>
-            </div>
-        </div>
-
+    <!-- Header: trip pills + rate badge -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <div class="trip-strip" id="trip-strip" style="flex:1;min-width:0;"></div>
+        <button class="trip-add-btn" onclick="openNewTripSheet()" title="New trip">+</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:12px;">
+        <span class="live-dot" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>
+        <span id="rate-text" style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">Fetching rate…</span>
     </div>
 
     <!-- Main Tab Navigation: Debit | Credit | Settings -->
@@ -219,15 +265,21 @@
     ═══════════════════════════════════════════════════ -->
     <div id="view-debit">
         <!-- Balance Banner -->
-        <div class="card mb-4" style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);color:white;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <div style="font-size:11px;opacity:0.75;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;">Fund Balance</div>
-                <div id="debit-balance-banner" style="font-size:28px;font-weight:700;line-height:1.15;font-family:'DM Mono',monospace;">$4,500</div>
+        <div class="card mb-4" style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);color:white;padding:16px 18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <div>
+                    <div style="font-size:11px;opacity:0.75;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;">Fund Balance</div>
+                    <div id="debit-balance-banner" style="font-size:28px;font-weight:700;line-height:1.15;font-family:'DM Mono',monospace;">$4,500</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:11px;opacity:0.75;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;">Total Spent</div>
+                    <div id="debit-spent-banner" style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;">$0.00</div>
+                    <div id="debit-pct-banner" style="font-size:11px;opacity:0.7;">0% used</div>
+                </div>
             </div>
-            <div style="text-align:right;">
-                <div style="font-size:11px;opacity:0.75;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;">Total Spent</div>
-                <div id="debit-spent-banner" style="font-size:20px;font-weight:600;font-family:'DM Mono',monospace;">$0.00</div>
-                <div id="debit-pct-banner" style="font-size:11px;opacity:0.7;">0% used</div>
+            <!-- Subtle progress bar -->
+            <div style="height:3px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
+                <div id="debit-progress-bar" style="height:100%;background:rgba(255,255,255,0.7);border-radius:2px;transition:width 0.4s ease;width:0%;"></div>
             </div>
         </div>
 
@@ -412,7 +464,7 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <div>
                     <div style="font-size:16px;font-weight:700;color:var(--text);">Members</div>
-                    <div style="font-size:12px;color:var(--text3);margin-top:2px;">Shared across both tabs</div>
+                    <div style="font-size:12px;color:var(--text3);margin-top:2px;">Per trip</div>
                 </div>
                 <button onclick="addMember()" style="background:var(--blue-bg);color:var(--blue);border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Add</button>
             </div>
@@ -458,6 +510,72 @@
                 <button onclick="clearCCData()" style="background:transparent;border:1.5px solid #fca5a5;color:#b91c1c;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;">Reset Credit</button>
                 <button onclick="clearAllData()" style="background:transparent;border:1.5px solid #fca5a5;color:#b91c1c;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;">Reset Everything</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Undo Toast -->
+<div id="undo-toast">
+    <span id="undo-toast-msg"></span>
+    <button onclick="undoLastEntry()">Undo</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TRIPS SHEET (new + archived)
+═══════════════════════════════════════════════════ -->
+<div id="new-trip-modal" class="modal-overlay">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:18px;">Trips</div>
+
+        <!-- Create new trip -->
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">New Trip</div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Trip Name</label>
+                <input type="text" id="new-trip-name" class="input-field" placeholder="e.g. Japan 2026"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();createTrip();}">
+            </div>
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Spending Currency</label>
+                <select id="new-trip-foreign" class="input-field"></select>
+            </div>
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Starting Balance (<span id="new-trip-home-label"></span>)</label>
+                <input type="number" inputmode="decimal" id="new-trip-balance" class="input-field" placeholder="e.g. 4500">
+            </div>
+            <button onclick="createTrip()" class="btn-primary">Create Trip</button>
+        </div>
+
+        <!-- Archived trips — hidden when none exist -->
+        <div id="archived-trips-section" style="display:none;">
+            <div style="height:1px;background:var(--border);margin-bottom:16px;"></div>
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Archived</div>
+            <div id="archived-trips-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+        </div>
+
+        <button onclick="closeNewTripSheet()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--surface3);color:var(--text2);font-size:15px;font-weight:600;cursor:pointer;">Close</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TRIP OPTIONS SHEET
+═══════════════════════════════════════════════════ -->
+<div id="trip-options-modal" class="modal-overlay">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div id="trip-options-name" style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;"></div>
+        <div id="trip-options-meta" style="font-size:12px;color:var(--text3);margin-bottom:20px;"></div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <!-- Rename -->
+            <div id="trip-rename-row" style="display:flex;gap:8px;">
+                <input type="text" id="trip-rename-input" class="input-field" style="flex:1;"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();renameTripFromSheet();}">
+                <button onclick="renameTripFromSheet()" style="background:var(--blue-bg);color:var(--blue);border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Rename</button>
+            </div>
+            <button id="trip-archive-btn" onclick="archiveTripFromSheet()" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;"></button>
+            <button onclick="deleteTripFromSheet()" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid #fca5a5;background:transparent;color:#b91c1c;font-size:14px;font-weight:600;cursor:pointer;">Delete Trip</button>
+            <button onclick="closeTripOptionsSheet()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--surface3);color:var(--text2);font-size:15px;font-weight:600;cursor:pointer;">Cancel</button>
         </div>
     </div>
 </div>
@@ -545,11 +663,82 @@
 </div>
 
 <script>
+// ─── TRIP SYSTEM ─────────────────────────────────────────────────────────────
+// Storage layout:
+//   trips_index              → [{id, name, archived, createdAt}]
+//   active_trip_id           → string
+//   trip_{id}_debit          → debit transactions
+//   trip_{id}_credit         → credit transactions
+//   trip_{id}_members        → members array
+//   trip_{id}_balance        → starting balance
+//   trip_{id}_foreign        → foreign currency code
+//   trip_{id}_rate           → cached exchange rate
+//   trip_{id}_name           → trip display name
+//   (global) home_cur        → home currency code
+//   (global) categories      → note categories
+//   (global) cat_usage       → usage counts
+//   (global) dark_mode       → theme preference
+
+function generateTripId() {
+    return 'trip_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function migrateToTrips() {
+    // Already migrated
+    if (localStorage.getItem('trips_index')) return;
+    // Wrap all existing flat keys under a default trip
+    const id = generateTripId();
+    const name = localStorage.getItem('trip_name') || 'My Trip';
+    const index = [{ id, name, archived: false, createdAt: new Date().toISOString() }];
+    // Copy existing flat data under trip namespace
+    const keys = { debit:'debit_tx', credit:'credit_tx', members:'members',
+                   balance:'starting_balance', foreign:'foreign_cur', rate:'cached_rate' };
+    for (const [suffix, oldKey] of Object.entries(keys)) {
+        const val = localStorage.getItem(oldKey);
+        if (val !== null) localStorage.setItem(`trip_${id}_${suffix}`, val);
+    }
+    // Use trip_name as trip-level name
+    if (name) localStorage.setItem(`trip_${id}_name`, name);
+    localStorage.setItem('trips_index', JSON.stringify(index));
+    localStorage.setItem('active_trip_id', id);
+    // Remove old flat keys
+    ['debit_tx','credit_tx','members','starting_balance','foreign_cur','cached_rate',
+     'trip_name'].forEach(k => localStorage.removeItem(k));
+}
+
+migrateToTrips();
+
+let tripsIndex   = JSON.parse(localStorage.getItem('trips_index') || '[]');
+let activeTripId = localStorage.getItem('active_trip_id') || (tripsIndex[0] && tripsIndex[0].id) || '';
+
+// If no trips exist at all (brand new install), create the default trip
+if (!tripsIndex.length) {
+    const id = generateTripId();
+    tripsIndex = [{ id, name: 'My Trip', archived: false, createdAt: new Date().toISOString() }];
+    activeTripId = id;
+    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+    localStorage.setItem('active_trip_id', id);
+}
+
+function tripKey(suffix) { return `trip_${activeTripId}_${suffix}`; }
+
+function loadTrip(id) {
+    activeTripId = id;
+    localStorage.setItem('active_trip_id', id);
+    debitTx        = JSON.parse(localStorage.getItem(`trip_${id}_debit`)   || '[]');
+    creditTx       = JSON.parse(localStorage.getItem(`trip_${id}_credit`)  || '[]');
+    members        = JSON.parse(localStorage.getItem(`trip_${id}_members`) || '["Person A","Person B","Person C"]');
+    startingBalance= parseFloat(localStorage.getItem(`trip_${id}_balance`) || '4500');
+    foreignCurCode = localStorage.getItem(`trip_${id}_foreign`) || 'JPY';
+    foreignToHome  = parseFloat(localStorage.getItem(`trip_${id}_rate`)    || getFallbackRate('JPY','USD') || '0.006335');
+    tripName       = localStorage.getItem(`trip_${id}_name`)    || 'My Trip';
+}
+
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let startingBalance = parseFloat(localStorage.getItem('starting_balance') || '4500');
-let debitTx    = JSON.parse(localStorage.getItem('debit_tx')    || '[]');
-let creditTx   = JSON.parse(localStorage.getItem('credit_tx')   || '[]');
-let members    = JSON.parse(localStorage.getItem('members')     || '["Person A","Person B","Person C"]');
+let startingBalance = 4500;
+let debitTx    = [];
+let creditTx   = [];
+let members    = ['Person A', 'Person B', 'Person C'];
 
 // ─── CURRENCY CATALOGUE ───────────────────────────────────────────────────────
 // Each entry: { code, symbol, name, decimals }
@@ -584,10 +773,11 @@ const CURRENCIES = [
 
 function getCur(code) { return CURRENCIES.find(c => c.code === code) || CURRENCIES[0]; }
 
-// Active currency pair — loaded from localStorage, default JPY/USD
-let foreignCurCode = localStorage.getItem('foreign_cur') || 'JPY';
-let homeCurCode    = localStorage.getItem('home_cur')    || 'USD';
-let foreignToHome  = parseFloat(localStorage.getItem('cached_rate') || '0.0067');
+// Currency / trip state — populated by loadTrip()
+let tripName       = 'My Trip';
+let foreignCurCode = 'JPY';
+let homeCurCode    = localStorage.getItem('home_cur') || 'USD';  // global
+let foreignToHome  = 0.006335;
 
 // Convenience getters
 function foreignCur() { return getCur(foreignCurCode); }
@@ -640,15 +830,7 @@ let catUsage   = JSON.parse(localStorage.getItem('cat_usage')  || '{}');
 // Which form is the picker currently serving
 let catPickerTarget = 'debit';
 
-// Migration: if old key exists, import it
-if (!localStorage.getItem('debit_tx') && localStorage.getItem('shared_withdrawals')) {
-    debitTx = JSON.parse(localStorage.getItem('shared_withdrawals') || '[]');
-    localStorage.setItem('debit_tx', JSON.stringify(debitTx));
-}
-if (!localStorage.getItem('members') && localStorage.getItem('shared_members')) {
-    members = JSON.parse(localStorage.getItem('shared_members') || '[]');
-    localStorage.setItem('members', JSON.stringify(members));
-}
+// Legacy migrations handled by migrateToTrips()
 
 // Filter/sort state
 let debitFilter = 'all', debitSort = 'date';
@@ -661,6 +843,10 @@ let ccCurrency    = 'foreign';
 // Selected members for multi-select
 let debitSelected = [];
 let ccSelected    = [];
+
+// Undo state
+let undoStack  = [];  // { type:'debit'|'credit', tx, index }
+let undoTimer  = null;
 
 // ─── EXCHANGE RATE ────────────────────────────────────────────────────────────
 // Fallback rates vs USD (approximate, updated March 17 2026).
@@ -727,13 +913,13 @@ async function fetchRate() {
     const rate = await fetchRateForPair(foreignCurCode, homeCurCode);
     if (rate) {
         foreignToHome = rate;
-        localStorage.setItem('cached_rate', rate.toString());
+        localStorage.setItem(tripKey('rate'), rate.toString());
         setRateBadge('live');
         updateDebitPreview(); updateCCPreview();
         return;
     }
     // No live rate — try localStorage cache first, then static fallback
-    const cached = parseFloat(localStorage.getItem('cached_rate'));
+    const cached = parseFloat(localStorage.getItem(tripKey('rate')));
     if (cached && cached > 0) {
         foreignToHome = cached;
         setRateBadge('cached');
@@ -801,14 +987,21 @@ function updateCurrencyLabels() {
 }
 
 function save() {
-    localStorage.setItem('debit_tx',        JSON.stringify(debitTx));
-    localStorage.setItem('credit_tx',       JSON.stringify(creditTx));
-    localStorage.setItem('members',         JSON.stringify(members));
-    localStorage.setItem('starting_balance',startingBalance.toString());
-    localStorage.setItem('categories',      JSON.stringify(categories));
-    localStorage.setItem('cat_usage',       JSON.stringify(catUsage));
-    localStorage.setItem('foreign_cur',     foreignCurCode);
-    localStorage.setItem('home_cur',        homeCurCode);
+    // Per-trip data
+    localStorage.setItem(tripKey('debit'),   JSON.stringify(debitTx));
+    localStorage.setItem(tripKey('credit'),  JSON.stringify(creditTx));
+    localStorage.setItem(tripKey('members'), JSON.stringify(members));
+    localStorage.setItem(tripKey('balance'), startingBalance.toString());
+    localStorage.setItem(tripKey('foreign'), foreignCurCode);
+    localStorage.setItem(tripKey('rate'),    foreignToHome.toString());
+    localStorage.setItem(tripKey('name'),    tripName);
+    // Update trip name in index too
+    const t = tripsIndex.find(t => t.id === activeTripId);
+    if (t) { t.name = tripName; localStorage.setItem('trips_index', JSON.stringify(tripsIndex)); }
+    // Global data
+    localStorage.setItem('categories', JSON.stringify(categories));
+    localStorage.setItem('cat_usage',  JSON.stringify(catUsage));
+    localStorage.setItem('home_cur',   homeCurCode);
 }
 
 // ─── MAIN TAB SWITCHING ───────────────────────────────────────────────────────
@@ -897,6 +1090,10 @@ function submitDebit() {
     document.getElementById('debit-amount').value = '';
     document.getElementById('debit-converted').textContent = '—';
     save(); renderDebit();
+    // Undo state — record indices of all splits just added
+    undoStack = splits.map((_, i) => ({ type: 'debit', index: debitTx.length - splits.length + i }));
+    const label = splits.length > 1 ? `Split across ${splits.length} members` : splits[0].person;
+    showUndoToast(`Added · ${label}`);
     document.getElementById('debit-amount').focus();
 }
 function submitCC() {
@@ -914,6 +1111,10 @@ function submitCC() {
     document.getElementById('cc-amount').value = '';
     document.getElementById('cc-converted').textContent = '—';
     save(); renderCredit();
+    // Undo state
+    undoStack = splits.map((_, i) => ({ type: 'credit', index: creditTx.length - splits.length + i }));
+    const label = splits.length > 1 ? `Split across ${splits.length} members` : splits[0].person;
+    showUndoToast(`Added · ${label}`);
     document.getElementById('cc-amount').focus();
 }
 
@@ -1065,6 +1266,31 @@ function clearNotesTrigger(target) {
     document.getElementById(target + '-notes-trigger').classList.remove('has-value');
 }
 
+// ─── UNDO TOAST ──────────────────────────────────────────────────────────────
+function showUndoToast(msg) {
+    const toast = document.getElementById('undo-toast');
+    document.getElementById('undo-toast-msg').textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(dismissUndoToast, 4000);
+}
+function dismissUndoToast() {
+    document.getElementById('undo-toast').classList.remove('show');
+    undoStack = [];
+}
+function undoLastEntry() {
+    if (!undoStack.length) return;
+    dismissUndoToast();
+    undoStack.forEach(({ type, index }) => {
+        if (type === 'debit')  debitTx.splice(index, 1);
+        else                   creditTx.splice(index, 1);
+    });
+    undoStack = [];
+    save();
+    renderDebit();
+    renderCredit();
+}
+
 // ─── FILTER / SORT ────────────────────────────────────────────────────────────
 function setDebitFilter(f) {
     debitFilter = f;
@@ -1121,6 +1347,7 @@ function renderDebit() {
     document.getElementById('debit-balance-banner').textContent = fmtHome(balance);
     document.getElementById('debit-spent-banner').textContent   = fmtHome(totalSpent);
     document.getElementById('debit-pct-banner').textContent     = `${pct}% used`;
+    document.getElementById('debit-progress-bar').style.width    = `${pct}%`;
 
     // Summary cards
     const sumEl = document.getElementById('debit-summary');
@@ -1442,6 +1669,271 @@ window.deleteEntry = (index, type) => {
     });
 };
 
+// ─── TRIP MANAGEMENT ──────────────────────────────────────────────────────────
+let tripOptionsTargetId = null;
+
+function renderTripStrip() {
+    const strip = document.getElementById('trip-strip');
+    strip.innerHTML = '';
+    const active = tripsIndex.filter(t => !t.archived);
+    active.forEach(t => {
+        const chip = document.createElement('div');
+        chip.className = 'trip-chip' + (t.id === activeTripId ? ' active' : '');
+        chip.innerHTML = `<span>${t.name}</span><button class="trip-chip-more" onclick="openTripOptionsSheet('${t.id}',event)">···</button>`;
+        chip.addEventListener('click', (e) => {
+            if (e.target.classList.contains('trip-chip-more')) return;
+            switchTrip(t.id);
+        });
+        strip.appendChild(chip);
+    });
+}
+
+function switchTrip(id) {
+    if (id === activeTripId) return;
+    dismissUndoToast();
+    loadTrip(id);
+    debitSelected  = members.length ? [members[0]] : [];
+    ccSelected     = members.length ? [members[0]] : [];
+    debitFilter = 'all'; debitSort = 'date';
+    ccFilter    = 'all'; ccSort    = 'date';
+    updateCurrencyLabels();
+    renderTripName();
+    renderTripStrip();
+    fetchRate();
+    const activeTab = document.querySelector('.tab-btn.active')?.id?.replace('mtab-','') || 'debit';
+    switchMainTab(activeTab);
+}
+
+// Attaches swipe-down-to-dismiss gesture to any bottom-sheet overlay.
+// onDismiss is called when the user drags down far enough or fast enough.
+function attachSwipeDismiss(overlay, onDismiss) {
+    const sheet = overlay.querySelector('.modal-sheet');
+    if (!sheet || sheet._swipeDismissAttached) return;
+    sheet._swipeDismissAttached = true;
+
+    let startY = 0, currentY = 0, dragging = false, startScrollTop = 0;
+    const DISMISS_THRESHOLD = 120; // px
+    const DISMISS_VELOCITY  = 0.5; // px/ms
+    let startTime = 0;
+
+    sheet.addEventListener('touchstart', e => {
+        // Only initiate if sheet is scrolled to top
+        startScrollTop = sheet.scrollTop;
+        if (startScrollTop > 2) return;
+        startY    = e.touches[0].clientY;
+        startTime = Date.now();
+        dragging  = true;
+        currentY  = 0;
+        sheet.style.transition = 'none';
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        // Abort if user has scrolled down into the sheet content
+        if (sheet.scrollTop > 2) { dragging = false; sheet.style.transform = ''; return; }
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0) return; // only downward
+        currentY = dy;
+        sheet.style.transform = `translateY(${currentY}px)`;
+        // Dim the backdrop proportionally
+        const ratio = Math.min(currentY / DISMISS_THRESHOLD, 1);
+        overlay.style.background = `rgba(0,0,0,${0.5 * (1 - ratio * 0.6)})`;
+    }, { passive: true });
+
+    sheet.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        const elapsed  = Date.now() - startTime;
+        const velocity = currentY / elapsed;
+        sheet.style.transition = 'transform 0.25s cubic-bezier(0.4,0,0.2,1)';
+        overlay.style.transition = 'background 0.25s';
+
+        if (currentY > DISMISS_THRESHOLD || velocity > DISMISS_VELOCITY) {
+            sheet.style.transform = `translateY(110%)`;
+            overlay.style.background = 'rgba(0,0,0,0)';
+            setTimeout(() => {
+                sheet.style.transform = '';
+                sheet.style.transition = '';
+                overlay.style.background = '';
+                overlay.style.transition = '';
+                sheet._swipeDismissAttached = false;
+                onDismiss();
+            }, 250);
+        } else {
+            sheet.style.transform = '';
+            overlay.style.background = '';
+            setTimeout(() => { sheet.style.transition = ''; overlay.style.transition = ''; }, 250);
+        }
+        currentY = 0;
+    });
+}
+
+function openNewTripSheet() {
+    const sel = document.getElementById('new-trip-foreign');
+    sel.innerHTML = CURRENCIES.map(cur => `<option value="${cur.code}">${cur.symbol} ${cur.code} — ${cur.name}</option>`).join('');
+    sel.value = foreignCurCode;
+    document.getElementById('new-trip-name').value = '';
+    document.getElementById('new-trip-balance').value = '';
+    document.getElementById('new-trip-home-label').textContent = `${homeCur().symbol} ${homeCurCode}`;
+
+    // Render archived trips list
+    const archived = tripsIndex.filter(t => t.archived);
+    const section  = document.getElementById('archived-trips-section');
+    const list     = document.getElementById('archived-trips-list');
+    section.style.display = archived.length ? 'block' : 'none';
+    list.innerHTML = '';
+    archived.forEach(t => {
+        const txCount = (JSON.parse(localStorage.getItem(`trip_${t.id}_debit`)  || '[]').length)
+                      + (JSON.parse(localStorage.getItem(`trip_${t.id}_credit`) || '[]').length);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:12px;background:var(--surface2);border:1.5px solid var(--border);';
+        row.innerHTML = `
+            <div style="min-width:0;">
+                <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.name}</div>
+                <div style="font-size:11px;color:var(--text4);margin-top:1px;">${txCount} transaction${txCount !== 1 ? 's' : ''}</div>
+            </div>
+            <button onclick="unarchiveTripFromSheet('${t.id}')"
+                style="background:var(--blue-bg);color:var(--blue);border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                Unarchive
+            </button>`;
+        list.appendChild(row);
+    });
+
+    const overlay = document.getElementById('new-trip-modal');
+    overlay.style.display = 'flex';
+    attachSwipeDismiss(overlay, closeNewTripSheet);
+    setTimeout(() => document.getElementById('new-trip-name').focus(), 300);
+}
+
+function unarchiveTripFromSheet(id) {
+    const t = tripsIndex.find(t => t.id === id);
+    if (!t) return;
+    t.archived = false;
+    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+    renderTripStrip();
+    closeNewTripSheet();
+}
+
+function closeNewTripSheet() {
+    document.getElementById('new-trip-modal').style.display = 'none';
+}
+
+function createTrip() {
+    const name    = document.getElementById('new-trip-name').value.trim() || 'New Trip';
+    const foreign = document.getElementById('new-trip-foreign').value;
+    const balance = parseFloat(document.getElementById('new-trip-balance').value) || 4500;
+    const id      = generateTripId();
+    const trip    = { id, name, archived: false, createdAt: new Date().toISOString() };
+    tripsIndex.push(trip);
+    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+    // Write initial trip data
+    localStorage.setItem(`trip_${id}_name`,    name);
+    localStorage.setItem(`trip_${id}_debit`,   '[]');
+    localStorage.setItem(`trip_${id}_credit`,  '[]');
+    localStorage.setItem(`trip_${id}_members`, JSON.stringify(['Person A','Person B','Person C']));
+    localStorage.setItem(`trip_${id}_balance`, balance.toString());
+    localStorage.setItem(`trip_${id}_foreign`, foreign);
+    const fallback = getFallbackRate(foreign, homeCurCode) || 0.006335;
+    localStorage.setItem(`trip_${id}_rate`,    fallback.toString());
+    closeNewTripSheet();
+    switchTrip(id);
+}
+
+function openTripOptionsSheet(id, e) {
+    if (e) { e.stopPropagation(); }
+    tripOptionsTargetId = id;
+    const t = tripsIndex.find(t => t.id === id);
+    if (!t) return;
+    const txCount = (JSON.parse(localStorage.getItem(`trip_${id}_debit`) || '[]').length)
+                  + (JSON.parse(localStorage.getItem(`trip_${id}_credit`) || '[]').length);
+    document.getElementById('trip-options-name').textContent = t.name;
+    document.getElementById('trip-options-meta').textContent = `${txCount} transaction${txCount !== 1 ? 's' : ''} · Created ${new Date(t.createdAt).toLocaleDateString()}`;
+    document.getElementById('trip-rename-input').value = t.name;
+    document.getElementById('trip-archive-btn').textContent = t.archived ? 'Unarchive Trip' : 'Archive Trip';
+    document.getElementById('trip-options-modal').style.display = 'flex';
+}
+
+function closeTripOptionsSheet() {
+    document.getElementById('trip-options-modal').style.display = 'none';
+    tripOptionsTargetId = null;
+}
+
+function renameTripFromSheet() {
+    const newName = document.getElementById('trip-rename-input').value.trim();
+    if (!newName || !tripOptionsTargetId) return;
+    const t = tripsIndex.find(t => t.id === tripOptionsTargetId);
+    if (!t) return;
+    t.name = newName;
+    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+    localStorage.setItem(`trip_${tripOptionsTargetId}_name`, newName);
+    if (tripOptionsTargetId === activeTripId) {
+        tripName = newName;
+        renderTripName();
+    }
+    renderTripStrip();
+    closeTripOptionsSheet();
+}
+
+function archiveTripFromSheet() {
+    if (!tripOptionsTargetId) return;
+    const t = tripsIndex.find(t => t.id === tripOptionsTargetId);
+    if (!t) return;
+    const isArchiving = !t.archived;
+    // Don't archive if it's the only active trip
+    const activeCount = tripsIndex.filter(t => !t.archived).length;
+    if (isArchiving && activeCount <= 1) {
+        closeTripOptionsSheet();
+        showConfirm('Cannot archive', 'You need at least one active trip.', 'OK', 'primary', () => {});
+        return;
+    }
+    t.archived = isArchiving;
+    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+    // If we archived the active trip, switch to another
+    if (isArchiving && tripOptionsTargetId === activeTripId) {
+        const next = tripsIndex.find(t => !t.archived);
+        if (next) switchTrip(next.id);
+    }
+    renderTripStrip();
+    closeTripOptionsSheet();
+}
+
+function deleteTripFromSheet() {
+    if (!tripOptionsTargetId) return;
+    const t = tripsIndex.find(t => t.id === tripOptionsTargetId);
+    if (!t) return;
+    const activeCount = tripsIndex.filter(t => !t.archived).length;
+    const isActive = tripOptionsTargetId === activeTripId;
+    closeTripOptionsSheet();
+    showConfirm(
+        `Delete "${t.name}"?`,
+        'All transactions in this trip will be permanently deleted.',
+        'Delete', 'danger',
+        () => {
+            // Remove all localStorage keys for this trip
+            [`trip_${t.id}_debit`,`trip_${t.id}_credit`,`trip_${t.id}_members`,
+             `trip_${t.id}_balance`,`trip_${t.id}_foreign`,`trip_${t.id}_rate`,
+             `trip_${t.id}_name`].forEach(k => localStorage.removeItem(k));
+            tripsIndex = tripsIndex.filter(tr => tr.id !== t.id);
+            localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+            // If deleted trip was active, switch to first available
+            if (isActive) {
+                const next = tripsIndex.find(t => !t.archived) || tripsIndex[0];
+                if (next) { switchTrip(next.id); }
+                else {
+                    // No trips left — create a fresh default
+                    const id = generateTripId();
+                    const fresh = { id, name:'My Trip', archived:false, createdAt:new Date().toISOString() };
+                    tripsIndex = [fresh];
+                    localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+                    switchTrip(id);
+                }
+            } else {
+                renderTripStrip();
+            }
+        }
+    );
+}
+
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
 function renderSettings() {
     document.getElementById('settings-balance').value = startingBalance;
@@ -1566,7 +2058,7 @@ async function applyCurrencyChange(newForeign, newHome, statusEl) {
     foreignCurCode = newForeign;
     homeCurCode    = newHome;
     foreignToHome  = rate;
-    if (rateSource === 'live') localStorage.setItem('cached_rate', rate.toString());
+    if (rateSource === 'live') localStorage.setItem(tripKey('rate'), rate.toString());
 
     // Recalculate all transactions to preserve their home-currency value.
     // Each tx stores the foreign amount (tx.jpy) and the rate used (tx.rate).
@@ -1592,6 +2084,11 @@ function addMember() {
     members.push(`Person ${members.length + 1}`);
     renderSettings();
     save();
+}
+
+// ─── TRIP NAME ────────────────────────────────────────────────────────────────
+function renderTripName() {
+    // Title h1 removed — trip name shown in the pill strip only
 }
 
 window.removeCategory = (cat) => {
@@ -1655,9 +2152,28 @@ window.clearCCData = () => {
 };
 window.clearAllData = () => {
     showConfirm('Reset everything?', 'All transactions and settings will be permanently deleted.', 'Reset All', 'danger', () => {
-        debitTx = []; creditTx = []; members = ['Person A', 'Person B', 'Person C'];
-        startingBalance = 4500;
         localStorage.clear();
+        // Re-init all state from scratch
+        const id = generateTripId();
+        tripsIndex   = [{ id, name:'My Trip', archived:false, createdAt:new Date().toISOString() }];
+        activeTripId = id;
+        localStorage.setItem('trips_index', JSON.stringify(tripsIndex));
+        localStorage.setItem('active_trip_id', id);
+        debitTx = []; creditTx = [];
+        members = ['Person A','Person B','Person C'];
+        startingBalance = 4500;
+        foreignCurCode = 'JPY'; homeCurCode = 'USD';
+        foreignToHome  = getFallbackRate('JPY','USD') || 0.006335;
+        categories = [...DEFAULT_CATEGORIES]; catUsage = {};
+        debitSelected = ['Person A']; ccSelected = ['Person A'];
+        debitFilter = 'all'; debitSort = 'date';
+        ccFilter = 'all'; ccSort = 'date';
+        tripName = 'My Trip';
+        undoStack = []; dismissUndoToast();
+        save();
+        updateCurrencyLabels();
+        renderTripName();
+        renderTripStrip();
         switchMainTab('debit');
     });
 };
@@ -1708,9 +2224,9 @@ window.importCSV = (event) => {
             const lines = e.target.result.trim().split('\n');
             const header = lines[0].toLowerCase();
             // Validate it looks like our CSV format
-            if (!header.includes('type') || !header.includes('member') || !header.includes('amount jpy')) {
+            if (!header.includes('type') || !header.includes('member') || !header.includes('amount')) {
                 status.textContent = '⚠️ Unrecognized CSV format.';
-                status.style.color = '#b91c1c';
+                status.style.color = '#dc2626';
                 return;
             }
             const newDebit = [], newCredit = [];
@@ -1754,25 +2270,29 @@ window.importCSV = (event) => {
                     renderSettings();
                     const msg = `✓ Restored ${newDebit.length + newCredit.length} transactions` + (skipped ? ` (${skipped} skipped)` : '');
                     status.textContent = msg;
-                    status.style.color = '#15803d';
+                    status.style.color = 'var(--blue)';
                     // Reset file input so same file can be re-uploaded if needed
                     event.target.value = '';
                 }
             );
         } catch(err) {
             status.textContent = '⚠️ Failed to parse CSV. Please use an unmodified backup file.';
-            status.style.color = '#b91c1c';
+            status.style.color = '#dc2626';
         }
     };
     reader.readAsText(file);
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// Load active trip into memory
+loadTrip(activeTripId);
 // Pre-select first member so form is immediately usable
 if (members.length > 0) { debitSelected = [members[0]]; ccSelected = [members[0]]; }
 // Initialise currency form toggle labels
 debitCurrency = 'foreign'; ccCurrency = 'foreign';
 updateCurrencyLabels();
+renderTripName();
+renderTripStrip();
 renderDebit();
 fetchRate();
 setInterval(fetchRate, 15 * 60 * 1000);
