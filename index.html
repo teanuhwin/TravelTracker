@@ -416,6 +416,12 @@
          SETTINGS TAB
     ═══════════════════════════════════════════════════ -->
     <div id="view-settings" style="display:none;">
+        <!-- Help -->
+        <button onclick="openHelpSheet()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-width="2" stroke-linecap="round" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
+            Getting Started
+        </button>
+
         <!-- Currency -->
         <div class="card mb-4" style="padding:18px;">
             <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;">Currency</div>
@@ -511,6 +517,101 @@
                 <button onclick="clearAllData()" style="background:transparent;border:1.5px solid #fca5a5;color:#b91c1c;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;">Reset Everything</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     HELP / QUICK START SHEET
+═══════════════════════════════════════════════════ -->
+<div id="help-modal" class="modal-overlay">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div style="font-size:18px;font-weight:700;color:var(--text);">Getting Started</div>
+            <button onclick="closeHelpSheet()" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text4);">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Section: Setup -->
+        <div style="margin-bottom:20px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">1 · Setup</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">💱</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">In <strong style="color:var(--text);">Settings</strong>, set your spending currency and starting cash balance</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">👥</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Add your travel group under <strong style="color:var(--text);">Members</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="height:1px;background:var(--divider);margin-bottom:20px;"></div>
+
+        <!-- Section: Recording -->
+        <div style="margin-bottom:20px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">2 · Recording a Transaction</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:14px;font-weight:700;color:var(--blue);flex-shrink:0;min-width:16px;">1</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Tap <strong style="color:var(--text);">Debit</strong> for cash or <strong style="color:var(--text);">Credit</strong> for card</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:14px;font-weight:700;color:var(--blue);flex-shrink:0;min-width:16px;">2</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Select who spent — tap multiple members to <strong style="color:var(--text);">split evenly</strong></span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:14px;font-weight:700;color:var(--blue);flex-shrink:0;min-width:16px;">3</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Enter amount → press <strong style="color:var(--text);">Enter</strong> to add a note → tap <strong style="color:var(--text);">Add Entry</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="height:1px;background:var(--divider);margin-bottom:20px;"></div>
+
+        <!-- Section: Trips -->
+        <div style="margin-bottom:20px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">3 · Trips</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">＋</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Tap <strong style="color:var(--text);">+</strong> in the top strip to create a new trip</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">···</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Tap <strong style="color:var(--text);">···</strong> on a trip to rename, archive, or delete it</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="height:1px;background:var(--divider);margin-bottom:20px;"></div>
+
+        <!-- Section: Tips -->
+        <div style="margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Tips</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">👈</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Swipe left on any transaction to delete it</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">✏️</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Tap a transaction to edit the amount, date, or note</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">↩️</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Tap <strong style="color:var(--text);">Undo</strong> in the toast that appears after submitting</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <span style="font-size:16px;flex-shrink:0;">💾</span>
+                    <span style="font-size:14px;color:var(--text2);line-height:1.4;">Download a CSV backup before clearing browser data</span>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="closeHelpSheet()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--surface3);color:var(--text2);font-size:15px;font-weight:600;cursor:pointer;">Got it</button>
     </div>
 </div>
 
@@ -2089,6 +2190,16 @@ function addMember() {
 // ─── TRIP NAME ────────────────────────────────────────────────────────────────
 function renderTripName() {
     // Title h1 removed — trip name shown in the pill strip only
+}
+
+// ─── HELP SHEET ───────────────────────────────────────────────────────────────
+function openHelpSheet() {
+    const overlay = document.getElementById('help-modal');
+    overlay.style.display = 'flex';
+    attachSwipeDismiss(overlay, closeHelpSheet);
+}
+function closeHelpSheet() {
+    document.getElementById('help-modal').style.display = 'none';
 }
 
 window.removeCategory = (cat) => {
