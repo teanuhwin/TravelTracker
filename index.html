@@ -508,10 +508,11 @@
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Download CSV Backup
                 </button>
-                <label style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--blue);background:var(--blue-bg);color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;">
+                <label style="position:relative;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--blue);background:var(--blue-bg);color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;overflow:hidden;">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m4 4V4m0 0l4 4"/></svg>
                     Upload CSV to Restore
-                    <input type="file" id="csv-upload" accept=".csv" style="display:none;" onchange="importCSV(event)">
+                    <input type="file" id="csv-upload" accept=".csv,text/csv,text/plain" onchange="importCSV(event)"
+                        style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
                 </label>
                 <div id="import-status" style="font-size:12px;text-align:center;color:var(--text3);min-height:16px;"></div>
             </div>
@@ -2365,6 +2366,7 @@ window.downloadCSV = () => {
 // ─── CSV IMPORT ───────────────────────────────────────────────────────────────
 window.importCSV = (event) => {
     const file = event.target.files[0];
+    const fileInput = event.target; // capture before async
     if (!file) return;
     const status = document.getElementById('import-status');
     const reader = new FileReader();
@@ -2379,6 +2381,7 @@ window.importCSV = (event) => {
                 return;
             }
             const newDebit = [], newCredit = [];
+            const newMembers = []; // collect separately — only merge on confirm
             let skipped = 0;
             lines.slice(1).forEach(line => {
                 if (!line.trim()) return;
@@ -2404,24 +2407,34 @@ window.importCSV = (event) => {
                 };
                 if (type.trim().toLowerCase() === 'debit') newDebit.push(tx);
                 else newCredit.push(tx);
-                // Add any new member names found in CSV
-                if (!members.includes(tx.person)) members.push(tx.person);
+                // Collect new member names without mutating live state yet
+                if (!members.includes(tx.person) && !newMembers.includes(tx.person)) {
+                    newMembers.push(tx.person);
+                }
             });
+            const totalTx = newDebit.length + newCredit.length;
+            const memberNote = newMembers.length
+                ? ` ${newMembers.length} new member${newMembers.length > 1 ? 's' : ''} will be added.`
+                : '';
             showConfirm(
                 'Restore from CSV?',
-                `This will replace all current data with ${newDebit.length} debit and ${newCredit.length} credit transactions.`,
+                `This will replace all current data with ${totalTx} transaction${totalTx !== 1 ? 's' : ''}.${memberNote}`,
                 'Restore',
                 'primary',
                 () => {
                     debitTx  = newDebit;
                     creditTx = newCredit;
+                    // Merge new members only on confirm
+                    newMembers.forEach(m => { if (!members.includes(m)) members.push(m); });
                     save();
+                    renderDebit();
+                    renderCredit();
                     renderSettings();
-                    const msg = `✓ Restored ${newDebit.length + newCredit.length} transactions` + (skipped ? ` (${skipped} skipped)` : '');
+                    const msg = `✓ Restored ${totalTx} transaction${totalTx !== 1 ? 's' : ''}` + (skipped ? ` · ${skipped} skipped` : '');
                     status.textContent = msg;
                     status.style.color = 'var(--blue)';
-                    // Reset file input so same file can be re-uploaded if needed
-                    event.target.value = '';
+                    // Reset file input so same file can be re-uploaded
+                    fileInput.value = '';
                 }
             );
         } catch(err) {
