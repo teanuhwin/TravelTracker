@@ -1,43 +1,44 @@
 // sw.js — Travel Tracker Service Worker
-// Bump this version string any time you update the app,
-// so the old cache gets replaced automatically.
-const CACHE_NAME = 'travel-tracker-v2';
+// Bump CACHE_NAME any time you update the app to force a fresh cache.
+const CACHE_NAME = 'travel-tracker-v3';
 
-// Everything the app needs to run with zero network access.
-// External CDN assets (Tailwind, Google Fonts) are also cached
-// on first load so they survive offline.
+// Core app shell — cached immediately on install so the app works offline
+// from the very first load.
 const PRECACHE_URLS = [
-    './',               // the HTML page itself (index route)
-    './index.html',     // explicit HTML filename fallback
+    './',
+    './index.html',
+    './manifest.json',
+    './icon.svg',
+    'https://cdn.tailwindcss.com',
+    'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap',
 ];
 
 // ── Install: cache the shell immediately ─────────────────────────────────────
 self.addEventListener('install', event => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(PRECACHE_URLS))
+            .then(() => self.skipWaiting())
     );
-    // Activate right away instead of waiting for old tabs to close
-    self.skipWaiting();
 });
 
-// ── Activate: delete any old caches from previous versions ───────────────────
+// ── Activate: delete old caches ───────────────────────────────────────────────
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(
+        caches.keys()
+            .then(keys => Promise.all(
                 keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-            )
-        )
+            ))
+            .then(() => self.clients.claim())
     );
-    self.clients.claim();
 });
 
-// ── Fetch: network-first for exchange-rate APIs, cache-first for everything else
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
-    // For exchange rate API calls — try network, don't cache (data changes),
-    // and if offline just let the app handle the failure gracefully.
+    // Exchange rate APIs — network only, never cache (data changes constantly).
+    // Fail silently so the app can handle offline gracefully.
     const isRateAPI = [
         'frankfurter.app',
         'open.er-api.com',
@@ -45,29 +46,32 @@ self.addEventListener('fetch', event => {
     ].some(host => url.hostname.includes(host));
 
     if (isRateAPI) {
-        // Pass straight through — no caching, app already has offline fallback
-        event.respondWith(fetch(event.request));
+        event.respondWith(
+            fetch(event.request).catch(() =>
+                new Response(JSON.stringify({ error: 'offline' }), {
+                    status: 503,
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            )
+        );
         return;
     }
 
-    // For everything else (the app shell + CDN assets):
-    // Try cache first, fall back to network and store the result.
+    // Everything else: cache-first, fall back to network and cache the result.
     event.respondWith(
         caches.match(event.request).then(cached => {
             if (cached) return cached;
 
             return fetch(event.request).then(response => {
-                // Only cache valid responses
                 if (!response || response.status !== 200 || response.type === 'error') {
                     return response;
                 }
                 const toCache = response.clone();
                 caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
                 return response;
-            }).catch(() => {
-                // Network failed and nothing in cache — nothing we can do
-                return new Response('Offline and not cached.', { status: 503 });
-            });
+            }).catch(() =>
+                new Response('Offline — resource not cached.', { status: 503 })
+            );
         })
     );
 });
