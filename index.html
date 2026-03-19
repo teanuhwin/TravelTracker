@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="color-scheme" content="light dark">
-    <title>Yen Tracking App Lite</title>
+    <title>Travel Tracker</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -92,8 +92,18 @@
         .av2 { background: #fce7f3; color: #be185d; }
         .av3 { background: #fef3c7; color: #b45309; }
         .av4 { background: #ede9fe; color: #7c3aed; }
-        @keyframes slideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-        .new-entry { animation: slideIn 0.25s ease forwards; }
+        @keyframes txSlideIn {
+            0%   { opacity:0; transform:translateY(-10px); }
+            50%  { opacity:1; transform:translateY(0); }
+            100% { opacity:1; transform:translateY(0); }
+        }
+        @keyframes txFlash {
+            0%   { background: var(--surface); }
+            25%  { background: var(--blue-bg); }
+            100% { background: var(--surface); }
+        }
+        .new-entry { animation: txSlideIn 0.35s cubic-bezier(0.2,0,0.2,1) forwards; }
+        .new-entry-flash { animation: txFlash 1.2s ease 0.3s forwards; }
         .safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 
         /* Member multi-select toggles */
@@ -949,6 +959,10 @@ let ccSelected    = [];
 let undoStack  = [];  // { type:'debit'|'credit', tx, index }
 let undoTimer  = null;
 
+// Tracks which tx indices should receive the flash animation after submit
+// Key: type ('debit'|'credit'), Value: Set of indices
+const newEntryIndices = { debit: new Set(), credit: new Set() };
+
 // ─── EXCHANGE RATE ────────────────────────────────────────────────────────────
 // Fallback rates vs USD (approximate, updated March 17 2026).
 // Used only when network is unavailable AND no cached rate exists.
@@ -1176,6 +1190,11 @@ function updateEditPreview() {
 }
 
 // ─── SUBMIT ENTRIES ───────────────────────────────────────────────────────────
+function buildToastLabel(splits, notes) {
+    const who  = splits.length > 1 ? `${splits.length}-way split` : splits[0].person;
+    const what = notes ? ` · ${notes}` : '';
+    return `${who}${what}`;
+}
 function submitDebit() {
     const val   = parseFloat(document.getElementById('debit-amount').value);
     const notes = document.getElementById('debit-notes').value.trim();
@@ -1190,12 +1209,14 @@ function submitDebit() {
     clearNotesTrigger('debit');
     document.getElementById('debit-amount').value = '';
     document.getElementById('debit-converted').textContent = '—';
+    // Record new indices BEFORE render so makeTxCard can read them
+    newEntryIndices.debit.clear();
+    const debitStart = debitTx.length - splits.length;
+    for (let i = 0; i < splits.length; i++) newEntryIndices.debit.add(debitStart + i);
+    undoStack = Array.from(newEntryIndices.debit).map(index => ({ type: 'debit', index }));
     save(); renderDebit();
-    // Undo state — record indices of all splits just added
-    undoStack = splits.map((_, i) => ({ type: 'debit', index: debitTx.length - splits.length + i }));
-    const label = splits.length > 1 ? `Split across ${splits.length} members` : splits[0].person;
-    showUndoToast(`Added · ${label}`);
-    document.getElementById('debit-amount').focus();
+    showUndoToast(`Added · ${buildToastLabel(splits, notes)}`);
+    scrollToNewEntry('debit-tx-list');
 }
 function submitCC() {
     const val   = parseFloat(document.getElementById('cc-amount').value);
@@ -1211,12 +1232,14 @@ function submitCC() {
     clearNotesTrigger('cc');
     document.getElementById('cc-amount').value = '';
     document.getElementById('cc-converted').textContent = '—';
+    // Record new indices BEFORE render so makeTxCard can read them
+    newEntryIndices.credit.clear();
+    const creditStart = creditTx.length - splits.length;
+    for (let i = 0; i < splits.length; i++) newEntryIndices.credit.add(creditStart + i);
+    undoStack = Array.from(newEntryIndices.credit).map(index => ({ type: 'credit', index }));
     save(); renderCredit();
-    // Undo state
-    undoStack = splits.map((_, i) => ({ type: 'credit', index: creditTx.length - splits.length + i }));
-    const label = splits.length > 1 ? `Split across ${splits.length} members` : splits[0].person;
-    showUndoToast(`Added · ${label}`);
-    document.getElementById('cc-amount').focus();
+    showUndoToast(`Added · ${buildToastLabel(splits, notes)}`);
+    scrollToNewEntry('cc-tx-list');
 }
 
 // ─── MEMBER MULTI-SELECT ─────────────────────────────────────────────────────
@@ -1367,6 +1390,22 @@ function clearNotesTrigger(target) {
     document.getElementById(target + '-notes-trigger').classList.remove('has-value');
 }
 
+// ─── SCROLL TO NEW ENTRY ─────────────────────────────────────────────────────
+function scrollToNewEntry(listId) {
+    // Dismiss keyboard first
+    if (document.activeElement) document.activeElement.blur();
+    // Wait one frame for render to complete
+    requestAnimationFrame(() => {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        // Scroll the activity card (parent of the list) to the top of the screen
+        const card = list.closest('.card') || list.parentElement;
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+}
+
 // ─── UNDO TOAST ──────────────────────────────────────────────────────────────
 function showUndoToast(msg) {
     const toast = document.getElementById('undo-toast');
@@ -1378,6 +1417,8 @@ function showUndoToast(msg) {
 function dismissUndoToast() {
     document.getElementById('undo-toast').classList.remove('show');
     undoStack = [];
+    newEntryIndices.debit.clear();
+    newEntryIndices.credit.clear();
 }
 function undoLastEntry() {
     if (!undoStack.length) return;
@@ -1588,8 +1629,9 @@ function makeTxCard(tx, visIndex, type) {
         : '';
 
     // Outer wrapper: clips the swipe reveal
+    const isNew = newEntryIndices[type] && newEntryIndices[type].has(tx.index);
     const row = document.createElement('div');
-    row.className = 'swipe-row' + (visIndex === 0 ? ' new-entry' : '');
+    row.className = 'swipe-row' + (isNew && visIndex === 0 ? ' new-entry' : '');
     row.style.borderBottom = '1px solid var(--divider)';
 
     // Red delete background
@@ -1601,7 +1643,7 @@ function makeTxCard(tx, visIndex, type) {
 
     // Sliding content layer
     const inner = document.createElement('div');
-    inner.className = 'swipe-content tx-card';
+    inner.className = 'swipe-content tx-card' + (isNew ? ' new-entry-flash' : '');
     inner.style.borderBottom = 'none';
     inner.innerHTML = `
         <div class="avatar ${avatarClass(memberIndex >= 0 ? memberIndex : 0)}">${initials(tx.person)}</div>
@@ -1749,7 +1791,11 @@ window.saveEdit = () => {
     if (!(jpy > 0)) return;
     const list = type === 'debit' ? debitTx : creditTx;
     const newDate = dateVal ? new Date(dateVal + 'T' + new Date(list[index].date).toTimeString().slice(0,8)).toISOString() : list[index].date;
-    list[index] = { ...list[index], person, jpy, rate: jpyToUsd, notes, date: newDate };
+    // Preserve the original rate unless the foreign amount changed,
+    // in which case stamp the current live rate.
+    const originalJpy = list[index].jpy;
+    const newRate = (jpy !== originalJpy) ? jpyToUsd : list[index].rate;
+    list[index] = { ...list[index], person, jpy, rate: newRate, notes, date: newDate };
     save();
     closeEditModal();
     if (type === 'debit') renderDebit(); else renderCredit();
@@ -1798,7 +1844,6 @@ function switchTrip(id) {
     debitFilter = 'all'; debitSort = 'date';
     ccFilter    = 'all'; ccSort    = 'date';
     updateCurrencyLabels();
-    renderTripName();
     renderTripStrip();
     fetchRate();
     const activeTab = document.querySelector('.tab-btn.active')?.id?.replace('mtab-','') || 'debit';
@@ -1969,7 +2014,6 @@ function renameTripFromSheet() {
     localStorage.setItem(`trip_${tripOptionsTargetId}_name`, newName);
     if (tripOptionsTargetId === activeTripId) {
         tripName = newName;
-        renderTripName();
     }
     renderTripStrip();
     closeTripOptionsSheet();
@@ -2187,11 +2231,6 @@ function addMember() {
     save();
 }
 
-// ─── TRIP NAME ────────────────────────────────────────────────────────────────
-function renderTripName() {
-    // Title h1 removed — trip name shown in the pill strip only
-}
-
 // ─── HELP SHEET ───────────────────────────────────────────────────────────────
 function openHelpSheet() {
     const overlay = document.getElementById('help-modal');
@@ -2283,7 +2322,6 @@ window.clearAllData = () => {
         undoStack = []; dismissUndoToast();
         save();
         updateCurrencyLabels();
-        renderTripName();
         renderTripStrip();
         switchMainTab('debit');
     });
@@ -2402,7 +2440,6 @@ if (members.length > 0) { debitSelected = [members[0]]; ccSelected = [members[0]
 // Initialise currency form toggle labels
 debitCurrency = 'foreign'; ccCurrency = 'foreign';
 updateCurrencyLabels();
-renderTripName();
 renderTripStrip();
 renderDebit();
 fetchRate();
