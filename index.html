@@ -1335,7 +1335,9 @@ function openCategoryPicker(target) {
     document.getElementById('cat-add-hint').textContent = '';
     document.getElementById('cat-add-btn').style.display = 'none';
     renderCatPills('', current);
-    document.getElementById('cat-modal').style.display = 'flex';
+    const catOverlay = document.getElementById('cat-modal');
+    catOverlay.style.display = 'flex';
+    attachSwipeDismiss(catOverlay, closeCategoryPicker);
     // Focus search after short delay so sheet animation settles
     setTimeout(() => document.getElementById('cat-search-input').focus(), 300);
 }
@@ -1801,8 +1803,9 @@ function makeCCTxCard(tx, visIndex) {
     const dateStr   = new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const isNew     = newEntryIndices.credit && newEntryIndices.credit.has(tx.index);
 
+    const perPersonUSD = isSplit ? ccUSD(tx) / splits.length : 0;
     const splitBadge = isSplit
-        ? `<span style="font-size:11px;color:#7c3aed;font-weight:600;white-space:nowrap;">split ${splits.length} ways</span>`
+        ? `<span style="font-size:11px;color:#7c3aed;font-weight:600;white-space:nowrap;">${fmtHome(perPersonUSD)} · ${splits.length} ways</span>`
         : '';
 
     const notesStr = tx.notes
