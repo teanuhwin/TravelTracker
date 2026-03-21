@@ -1,6 +1,6 @@
 // sw.js — Travel Tracker Service Worker
 // Bump CACHE_NAME any time you update the app to force a fresh cache.
-const CACHE_NAME = 'travel-tracker-v3.4';
+const CACHE_NAME = 'travel-tracker-v3.5';
 
 // Core app shell — cached immediately on install so the app works offline
 // from the very first load.
